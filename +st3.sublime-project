@@ -3,6 +3,8 @@
   "folders":
   [
     {"path": "."},
+    {"name": "incA","path": "F:\\ARGilyazeev\\msys64\\mingw64\\x86_64-w64-mingw32\\include"},
+    {"name": "incB","path": "F:\\ARGilyazeev\\msys64\\mingw64\\include"},
   ],
   "settings":
   {
