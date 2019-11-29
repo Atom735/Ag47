@@ -156,10 +156,9 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
   BYTE iSection = '\0';         // Символ названия секции
 
   // 0,1,2,3 -- MNEM, UNIT, DATA, DESC
-  // 4,5,6,7 -- STRT, STOP, STEP, NULL
-  // 8,9     -- METD, DATE
-  BYTE const * pD[10] = { };
-  UINT nD[10] = { };
+  // 4       -- METD
+  BYTE const * pD[5] = { };
+  UINT nD[5] = { };
   // 0,1,2,3 -- STRT, STOP, STEP, NULL
   double fD[4] = { };
   BOOL bD[4] = { };
@@ -253,10 +252,30 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
     switch ( iSection )
     {
       case 'W':
+        #define D7_IF_MNEM(a) ( ( memcmp ( pD[0], a, nD[0] ) == 0 ) && ( nD[0] == sizeof(a) - 1 ) )
+        #define D7_IF_DATA(a) ( ( memcmp ( pD[2], a, nD[2] ) == 0 ) && ( nD[2] == sizeof(a) - 1 ) )
+        #define D7_SSSN(a) LPSTR pp; fD[a] = strtod ( (LPCSTR)(pD[2]), &pp ); bD[a] = ((LONG_PTR)pp != (LONG_PTR)pD[2]);
+
+        // Разбираем STRT, STOP, STEP и NULL
+        if ( D7_IF_MNEM ( "STRT" ) ) { D7_SSSN(0); }
+        else
+        if ( D7_IF_MNEM ( "STOP" ) ) { D7_SSSN(1); }
+        else
+        if ( D7_IF_MNEM ( "STEP" ) ) { D7_SSSN(2); }
+        else
+        if ( D7_IF_MNEM ( "NULL" ) ) { D7_SSSN(3); }
+        else
+        if ( D7_IF_MNEM ( "METD" ) )
+        {
+          if ( D7_IF_DATA ( "METHOD" ) )
+          { pD[4] = pD[2]; nD[4] = nD[2]; }
+          else
+          { pD[4] = pD[3]; nD[4] = nD[3]; }
+        }
         break;
       case 'C':
         // Находим методы ГИС
-        if ( nC == 0 )
+        if ( kC == 0 )
         {
           if ( ( memcmp ( pD[0], "DEPT", nD[0] ) != 0 ) )
           { D7PRNT_EL ( L"Первый параметр секции ~C не глубина" ); goto P_SkipLine; }
