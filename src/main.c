@@ -18,6 +18,7 @@ static WCHAR w7Path [ kPathMaxLen ];
 
 
 
+
 static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
 {
   FILE * const fd = _wfopen ( wszFname, L"wb" );
@@ -129,9 +130,58 @@ static UINT rW7_add ( const LPWSTR w7Dst, const LPCWSTR wszSrc )
 #define D7IF_4_RAR ( D7IF_1(3,'.') && D7IF_3(2,'R','A','R') )
 #define D7IF_4_ARCHIVE ( D7IF_4_ZIP || D7IF_4_RAR )
 
-static VOID rParseLasData ( const PBYTE pData, const UINT nSize )
-{
+#define D7SKIP_WHILE(a) while ((a) && *p) { ++p; }
+#define D7_IF_CRLF(a) (((a) == '\n') || ((a) == '\r'))
+#define D7_IF_SPACE(a) (((a) == ' ') || ((a) == '\t'))
 
+#define D7PRNTF(...) fwprintf ( pF, L"    " __VA_ARGS__ );
+#define D7PRNT_EL(a) D7PRNT_E(L"(Line %u) %s\n",nLine,a)
+
+/* Разбор данных LAS */
+static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
+{
+  {
+    const LPCSTR lc = rGetCodePage ( pData, nSize );
+    setlocale ( LC_ALL, lc );
+    D7PRNTF ( L"~ Размер файла: %d KiB\n", nSize/1024 );
+    D7PRNTF ( L"~ Кодировка: CP%hs\n", lc );
+  }
+  BYTE const * p = pData;       // Указатель на обрабатываемый байт
+  UINT nLine = 1;               // Номер обрабатываемой линии
+  BYTE iSection = '\0';         // Символ названия секции
+
+  // Изначально находимся на новой строке, поэтому сразу переходим к выбору секции
+  goto P_State_NewLine;
+
+  P_SkipLine: // Переход на новую строку
+    D7SKIP_WHILE ( !D7_IF_CRLF ( *p ) );
+    if ( D7_IF_CRLF ( *p ) ) { ++p; ++nLine; }
+    else { goto P_End; }
+
+  P_State_NewLine: // Начало новой строки
+    D7SKIP_WHILE ( D7_IF_SPACE ( *p ) || D7_IF_CRLF ( *p ) );
+    if ( *p == '~' )
+    {
+      // Начало секции
+      switch ( p[1] )
+      {
+        case 'V': case 'W': case 'C': case 'P': case 'O': iSection = p[1]; goto P_SkipLine;
+        case 'A': goto P_Section_A;
+        default: D7PRNT_EL ( L"Некорректное значение начала секци" ); goto P_SkipLine;
+      }
+    }
+    else if ( *p == '#' ) { goto P_SkipLine; }
+  P_Section:
+    // Разбираем строку секции
+    goto P_SkipLine;
+  P_Section_A:
+    // Секция с числовыми данными
+
+
+  P_End:
+    // Конец обработки файла, анализ и копирование
+
+  return;
 }
 
 /* Загрузка файла в память */
@@ -299,6 +349,8 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
     rW7_set ( w7Path, argv[i] );
     rParseFile();
   }
+
+  printf ( "%d\n", atoi ( "   1312093saodakskdo") );
 
   fclose ( pF );
   return 0;
