@@ -15,6 +15,7 @@
 
 static FILE * pF = NULL;
 static FILE * pF_S = NULL;
+static FILE * pF_M = NULL;
 static WCHAR w7Path [ kPathMaxLen ];
 
 
@@ -154,8 +155,23 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
   UINT nLine = 1;               // Номер обрабатываемой линии
   BYTE iSection = '\0';         // Символ названия секции
 
-  BYTE const * pD[4] = { };
-  UINT nD[4] = { };
+  // 0,1,2,3 -- MNEM, UNIT, DATA, DESC
+  // 4,5,6,7 -- STRT, STOP, STEP, NULL
+  // 8,9     -- METD, DATE
+  BYTE const * pD[10] = { };
+  UINT nD[10] = { };
+  // 0,1,2,3 -- STRT, STOP, STEP, NULL
+  double fD[4] = { };
+  BOOL bD[4] = { };
+
+  // METHODS
+  #define kMethodsMax 16
+  BYTE const * pC [kMethodsMax] = { };
+  UINT         nC [kMethodsMax] = { };
+  double       fCA[kMethodsMax] = { }; // Start of method
+  double       fCB[kMethodsMax] = { }; // End of method
+  double       fCT = 0.0; // Temp value
+  UINT         kC = 0; // Cont of methods
 
   // Изначально находимся на новой строке, поэтому сразу переходим к выбору секции
   goto P_State_NewLine;
@@ -234,9 +250,52 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
             nD[0],pD[0],nD[1],pD[1],nD[2],pD[2],nD[3],pD[3],
             w7Path+1 );
 
+    switch ( iSection )
+    {
+      case 'W':
+        break;
+      case 'C':
+        // Находим методы ГИС
+        if ( nC == 0 )
+        {
+          if ( ( memcmp ( pD[0], "DEPT", nD[0] ) != 0 ) )
+          { D7PRNT_EL ( L"Первый параметр секции ~C не глубина" ); goto P_SkipLine; }
+          else { ++kC; }
+        }
+        else
+        {
+          pC[kC-1] = pD[0];
+          nC[kC-1] = nD[0];
+          fwprintf ( pF_M, L"%-16.*hs%-64.*hs%-64.*hs%s\n", nD[0],pD[0],nD[2],pD[2],nD[3],pD[3], w7Path+1 );
+          ++kC;
+        }
+        break;
+    }
+
     goto P_SkipLine;
   P_Section_A:
+  {
     // Секция с числовыми данными
+    UINT nK = 0;
+    --kC;
+    BOOL b = FALSE;
+    if ( bD[0] == FALSE ) { D7PRNT_EL ( L"Не удалось получить значение поля [STRT]" ); b = TRUE; }
+    if ( bD[1] == FALSE ) { D7PRNT_EL ( L"Не удалось получить значение поля [STOP]" ); b = TRUE; }
+    if ( bD[2] == FALSE ) { D7PRNT_EL ( L"Не удалось получить значение поля [STEP]" ); b = TRUE; }
+    if ( bD[3] == FALSE ) { D7PRNT_EL ( L"Не удалось получить значение поля [NULL]" ); b = TRUE; }
+    if ( b ) goto P_End;
+    if ( fD[1] - fD[0] > 0.0 )
+    {
+      nK = (UINT)(((fD[1] - fD[0]) / fD[2]));
+    }
+    else
+    {
+      D7PRNT_EL ( L"[ STOP < STRT ]" ); goto P_End;
+    }
+    D7SKIP_WHILE ( !D7_IF_CRLF ( *p ) );
+    if ( D7_IF_CRLF ( *p ) ) { ++p; ++nLine; }
+    else { goto P_End; }
+  }
 
 
   P_End:
@@ -394,6 +453,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
   printf ( "setlocale: %s\n", setlocale ( LC_ALL, "" ) );
   pF = rOpenFileToWriteWith_UTF16_BOM ( L"out.log" );
   pF_S = rOpenFileToWriteWith_UTF16_BOM ( L"sections.log" );
+  pF_M = rOpenFileToWriteWith_UTF16_BOM ( L"methods.log" );
   fwprintf ( pF, L"ARGC >> %d\n", argc );
   for ( UINT i = 0; i < argc; ++i )
   { fwprintf ( pF, L"ARGV[%d] >> %s\n", i, argv[i] ); }
@@ -414,6 +474,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 
   printf ( "%d\n", atoi ( "   1312093saodakskdo") );
 
+  fclose ( pF_M );
   fclose ( pF_S );
   fclose ( pF );
   return 0;
