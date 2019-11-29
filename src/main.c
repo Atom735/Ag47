@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <locale.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,6 +17,7 @@
 static FILE * pF = NULL;
 static FILE * pF_S = NULL;
 static FILE * pF_M = NULL;
+static FILE * pF_O = NULL;
 static WCHAR w7Path [ kPathMaxLen ];
 
 
@@ -169,7 +171,6 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
   UINT         nC [kMethodsMax] = { };
   double       fCA[kMethodsMax] = { }; // Start of method
   double       fCB[kMethodsMax] = { }; // End of method
-  double       fCT = 0.0; // Temp value
   UINT         kC = 0; // Cont of methods
 
   // Изначально находимся на новой строке, поэтому сразу переходим к выбору секции
@@ -314,6 +315,45 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
     D7SKIP_WHILE ( !D7_IF_CRLF ( *p ) );
     if ( D7_IF_CRLF ( *p ) ) { ++p; ++nLine; }
     else { goto P_End; }
+
+    // Устанавливаем верхнюю границу снизу, а нижнюю сверху
+    for ( UINT i = 0; i < kC; ++i )
+    { fCA[i] = fD[1]; fCB[i] = fD[0]; }
+    // Начинаем считыавать числа
+    LPSTR pp;
+    // Первое число -- значение глубины
+    double fDD = strtod ( (LPCSTR)p, &pp );
+    UINT nKK = 0;
+    // Пока числа считываются
+    while ( (LONG_PTR)p != (LONG_PTR)pp )
+    {
+      ++nKK;
+      p = (BYTE const *)(pp);
+      for ( UINT i = 0; i < kC; ++i )
+      {
+        // считываем значение
+        double f = strtod ( (LPCSTR)p, &pp );
+        // если он не близок к значению NULL, т.е. значение существует
+        #define kAsciiDataErr 0.01
+        if ( fabs ( f-fD[3] ) > kAsciiDataErr )
+        {
+          // если верхняя граница ниже настоящего значения, то записываем и с другой границе также
+          if ( fCA[i] >= fDD ) { fCA[i] = fDD; }
+          if ( fCB[i] <= fDD ) { fCB[i] = fDD; }
+        }
+        if ( (LONG_PTR)p == (LONG_PTR)pp )
+        {
+          D7PRNT_E ( L"Ошибка чтения данных в секции ASCII (%u/%u)\n", nKK, nK );
+          goto P_End;
+        }
+        p = (BYTE const *)(pp);
+      }
+      fDD = strtod ( (LPCSTR)p, &pp );
+    }
+    if ( nKK < nK )
+    {
+      D7PRNT_E ( L"Не все данные секции ASCII были прочитаны %u/%u\n", nKK, nK );
+    }
   }
 
 
