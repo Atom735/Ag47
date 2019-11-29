@@ -14,6 +14,7 @@
 #define kPathMaxLen 2048
 
 static FILE * pF = NULL;
+static FILE * pF_S = NULL;
 static WCHAR w7Path [ kPathMaxLen ];
 
 
@@ -131,11 +132,14 @@ static UINT rW7_add ( const LPWSTR w7Dst, const LPCWSTR wszSrc )
 #define D7IF_4_ARCHIVE ( D7IF_4_ZIP || D7IF_4_RAR )
 
 #define D7SKIP_WHILE(a) while ((a) && *p) { ++p; }
+#define D7SKIP_WHILE_SPACE() D7SKIP_WHILE(D7_IF_SPACE(*p))
 #define D7_IF_CRLF(a) (((a) == '\n') || ((a) == '\r'))
 #define D7_IF_SPACE(a) (((a) == ' ') || ((a) == '\t'))
 
 #define D7PRNTF(...) fwprintf ( pF, L"    " __VA_ARGS__ );
 #define D7PRNT_EL(a) D7PRNT_E(L"(Line %u) %s\n",nLine,a)
+#define D7_LAS_SET_nD(i) nD[i] = (LONG_PTR)(p)-(LONG_PTR)(pD[i]);
+#define D7_TRIM_LAST_SPACE(_pD,_nD) while ( (_nD) && D7_IF_SPACE((_pD)[_nD-1]) ) { --(_nD); }
 
 /* Разбор данных LAS */
 static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
@@ -149,6 +153,9 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
   BYTE const * p = pData;       // Указатель на обрабатываемый байт
   UINT nLine = 1;               // Номер обрабатываемой линии
   BYTE iSection = '\0';         // Символ названия секции
+
+  BYTE const * pD[4] = { };
+  UINT nD[4] = { };
 
   // Изначально находимся на новой строке, поэтому сразу переходим к выбору секции
   goto P_State_NewLine;
@@ -171,8 +178,62 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
       }
     }
     else if ( *p == '#' ) { goto P_SkipLine; }
-  P_Section:
+
+    ////  MNEM
     // Разбираем строку секции
+    nD[3] = nD[2] = nD[1] = nD[0] = 0;
+    // Разбираем мнемонику
+    if ( !isalnum ( *p ) && *p && *p < 0x80 ) { D7PRNT_EL ( L"Некорректное название мнемоники" ); goto P_SkipLine; }
+    pD[0] = p;
+    while ( isalnum ( *p ) || *p == '_' || *p > 0x80 || *p == '(' || *p == ')' )
+    {
+      if ( *p == ')' )  { D7PRNT_EL ( L"Закрывающая скобка без открывабщей в названии мнемоники" ); goto P_SkipLine; }
+      else
+      // Если нашли открывающую скобку
+      if ( *p == '(' )
+      {
+        // Ищем закрывающую скобку
+        while ( *p != ')' && *p ) { ++p; }
+        if ( *p == ')' ) { ++p; }
+        else { D7PRNT_EL ( L"Отсутсвует закрывающая скобка в названии мнемоники" );  goto P_SkipLine; }
+        // Считается что после скобок пустая строка до точки
+        break;
+      }
+      ++p;
+    }
+    D7_LAS_SET_nD ( 0 );
+    D7SKIP_WHILE_SPACE();
+    if ( *p != '.' ) { D7PRNT_EL ( L"Отсутсвует разделитель [.] после мнемоники" ); goto P_SkipLine; }
+    ++p;
+    ////  UNITS
+    // размерность данных
+    pD[1] = p;
+    // доходим до первого пробела
+    while ( !isspace ( *p ) && *p ) { ++p; }
+    D7_LAS_SET_nD ( 1 );
+    D7SKIP_WHILE_SPACE();
+    ////  DATA
+    // данные
+    pD[2] = p;
+    // доходим до разделителя
+    while ( *p != ':' && !D7_IF_CRLF(*p) && *p ) { ++p; }
+    if ( *p != ':' ) { D7PRNT_EL ( L"Отсутсвие разделитель [:] после данных" ); goto P_SkipLine; }
+    D7_LAS_SET_nD ( 2 );
+    ++p;
+    D7_TRIM_LAST_SPACE(pD[2],nD[2]);
+    D7SKIP_WHILE_SPACE();
+    ////  DESCRIPTION
+    // данные описания
+    pD[3] = p;
+    while ( !D7_IF_CRLF(*p) && *p ) { ++p; }
+    D7_LAS_SET_nD ( 3 );
+    D7_TRIM_LAST_SPACE(pD[3],nD[3]);
+
+    fwprintf ( pF_S, L"~%c %-8.*hs.%-8.*hs %-32.*hs : %-32.*hs  %s\n",
+            iSection,
+            nD[0],pD[0],nD[1],pD[1],nD[2],pD[2],nD[3],pD[3],
+            w7Path+1 );
+
     goto P_SkipLine;
   P_Section_A:
     // Секция с числовыми данными
@@ -332,6 +393,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 {
   printf ( "setlocale: %s\n", setlocale ( LC_ALL, "" ) );
   pF = rOpenFileToWriteWith_UTF16_BOM ( L"out.log" );
+  pF_S = rOpenFileToWriteWith_UTF16_BOM ( L"sections.log" );
   fwprintf ( pF, L"ARGC >> %d\n", argc );
   for ( UINT i = 0; i < argc; ++i )
   { fwprintf ( pF, L"ARGV[%d] >> %s\n", i, argv[i] ); }
@@ -352,6 +414,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 
   printf ( "%d\n", atoi ( "   1312093saodakskdo") );
 
+  fclose ( pF_S );
   fclose ( pF );
   return 0;
 }
