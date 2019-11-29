@@ -171,7 +171,7 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
   UINT         nC [kMethodsMax] = { };
   double       fCA[kMethodsMax] = { }; // Start of method
   double       fCB[kMethodsMax] = { }; // End of method
-  UINT         kC = 0; // Cont of methods
+  UINT         kC = 0; // Count of methods
 
   // Изначально находимся на новой строке, поэтому сразу переходим к выбору секции
   goto P_State_NewLine;
@@ -255,6 +255,7 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
       case 'W':
         #define D7_IF_MNEM(a) ( ( memcmp ( pD[0], a, nD[0] ) == 0 ) && ( nD[0] == sizeof(a) - 1 ) )
         #define D7_IF_DATA(a) ( ( memcmp ( pD[2], a, nD[2] ) == 0 ) && ( nD[2] == sizeof(a) - 1 ) )
+        #define D7_IF_DESC(a) ( ( memcmp ( pD[3], a, nD[3] ) == 0 ) && ( nD[3] == sizeof(a) - 1 ) )
         #define D7_SSSN(a) LPSTR pp; fD[a] = strtod ( (LPCSTR)(pD[2]), &pp ); bD[a] = ((LONG_PTR)pp != (LONG_PTR)pD[2]);
 
         // Разбираем STRT, STOP, STEP и NULL
@@ -268,9 +269,10 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
         else
         if ( D7_IF_MNEM ( "METD" ) )
         {
-          if ( D7_IF_DATA ( "METHOD" ) )
+          if ( !D7_IF_DATA ( "METHOD" ) )
           { pD[4] = pD[2]; nD[4] = nD[2]; }
           else
+          if ( !D7_IF_DESC ( "METHOD" ) )
           { pD[4] = pD[3]; nD[4] = nD[3]; }
         }
         break;
@@ -278,9 +280,8 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
         // Находим методы ГИС
         if ( kC == 0 )
         {
-          if ( ( memcmp ( pD[0], "DEPT", nD[0] ) != 0 ) )
-          { D7PRNT_EL ( L"Первый параметр секции ~C не глубина" ); goto P_SkipLine; }
-          else { ++kC; }
+          if ( D7_IF_MNEM ( "DEPT" ) || D7_IF_MNEM ( "DEPTH" ) ) { ++kC; goto P_SkipLine; }
+          else { D7PRNT_EL ( L"Первый параметр секции ~C не глубина" ); goto P_SkipLine; }
         }
         else
         {
@@ -288,6 +289,7 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
           nC[kC-1] = nD[0];
           fwprintf ( pF_M, L"%-16.*hs%-64.*hs%-64.*hs%s\n", nD[0],pD[0],nD[2],pD[2],nD[3],pD[3], w7Path+1 );
           ++kC;
+          goto P_SkipLine;
         }
         break;
     }
@@ -295,6 +297,7 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
     goto P_SkipLine;
   P_Section_A:
   {
+    if ( kC == 0 ) goto P_End;
     // Секция с числовыми данными
     UINT nK = 0;
     --kC;
@@ -359,6 +362,17 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
 
   P_End:
     // Конец обработки файла, анализ и копирование
+
+    fwprintf ( pF_O, L"% 8i\t%.6f\t%.6f\t%.6f\t%.6f\t%8.*hs\t|", 0,
+              fD[0], fD[1], fD[2], fD[3],
+              nD[4], pD[4] );
+    for ( UINT k = 0; k < kC; ++k )
+    {
+      for(UINT i = 0; i < nC[k]; ++i)
+      { if( ispunct( pC[k][i] ) ) nC[k] = i; break; }
+      fwprintf ( pF_O, L"%8.*hs\t%.6f\t%.6f\t|", nC[k], pC[k], fCA[k], fCB[k] );
+    }
+    fwprintf ( pF_O, L"\t\t\t%s\n", w7Path+1 );
 
   return;
 }
@@ -513,6 +527,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
   pF = rOpenFileToWriteWith_UTF16_BOM ( L"out.log" );
   pF_S = rOpenFileToWriteWith_UTF16_BOM ( L"sections.log" );
   pF_M = rOpenFileToWriteWith_UTF16_BOM ( L"methods.log" );
+  pF_O = rOpenFileToWriteWith_UTF16_BOM ( L"table.log" );
   fwprintf ( pF, L"ARGC >> %d\n", argc );
   for ( UINT i = 0; i < argc; ++i )
   { fwprintf ( pF, L"ARGV[%d] >> %s\n", i, argv[i] ); }
@@ -533,6 +548,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 
   printf ( "%d\n", atoi ( "   1312093saodakskdo") );
 
+  fclose ( pF_O );
   fclose ( pF_M );
   fclose ( pF_S );
   fclose ( pF );
