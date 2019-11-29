@@ -1,5 +1,6 @@
 *.lnk
 *.sublime-workspace
+*.log
 
 # Prerequisites
 *.d
