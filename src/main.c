@@ -212,7 +212,7 @@ static LPVOID rV7_Alloc ( const UINT nElementSize, UINT nCount )
 }
 static LPWSTR * rV7_Alloc_W7 ( UINT nCount )
 {
-  return rV7_Alloc ( sizeof(WCHAR), nCount );
+  return rV7_Alloc ( sizeof(LPWSTR), nCount );
 }
 // Создаёт копию вектора
 static LPVOID rV7_Copy ( const LPVOID v7, UINT nCount )
@@ -505,7 +505,7 @@ static UINT rScriptParse ( LPWSTR p )
 
   P_Ok:
 
-    // _rLogVW7  ( L"PATH_IN", gScript.vw7PathIn );
+    _rLogVW7  ( L"PATH_IN", gScript.vw7PathIn );
     _rLogVW7  ( L"FORMAT_LAS", gScript.vw7PostfixLas );
     _rLogVW7  ( L"FORMAT_INCL", gScript.vw7PostfixIncl );
     _rLogVW7  ( L"FORMAT_AR", gScript.vw7PostfixAr );
