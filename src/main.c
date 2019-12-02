@@ -20,7 +20,7 @@ static FILE * pF_M = NULL;
 static FILE * pF_O = NULL;
 static WCHAR w7Path [ kPathMaxLen ];
 
-
+#include "cyrillic.c"
 
 
 static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
@@ -33,64 +33,32 @@ static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
 /*
   Функция получения номера кодировки для однбайтовых данных совместимых с кодировкой ASCII
   @ p                   указатель на начало данных
-  @ n                   оличество данных
-  @ return              строка с кодировкой пример ".1252" для функции setlocale
+  @ n                   количество данных
+  @ return              номер кодировки из базы
 */
-LPCSTR rGetCodePage ( BYTE const * p, UINT n )
+UINT rGetCodePage ( BYTE const * p, UINT n )
 {
-  static const LPCSTR pOut[] =
-  { // https://docs.microsoft.com/ru-ru/windows/win32/intl/code-page-identifiers
-    ".1251", ".866", ".855", ".10007", ".28595"
-  };
-  UINT u[5] = { };
+  UINT u[kNCyrillicTables] = { };
   while ( n )
   {
-    // https://ru.wikipedia.org/wiki/CP855
-    switch ( *p )
+    if ( (*p) & 0x80 )
     {
-      case 0x9C ... 0x9D:
-      case 0xA0 ... 0xAD:
-      case 0xB5 ... 0xB8:
-      case 0xC6 ... 0xC7:
-      case 0xD0 ... 0xD8:
-      case 0xDD ... 0xDE:
-      case 0xE0 ... 0xEE:
-      case 0xF1 ... 0xFC:
-        ++u[2]; break;
-    }
-    // https://ru.wikipedia.org/wiki/CP866
-    switch ( *p )
-    {
-      case 0x80 ... 0xAF:
-      case 0xE0 ... 0xF1:
-        ++u[1]; break;
-    }
-    // https://ru.wikipedia.org/wiki/Windows-1251
-    switch ( *p )
-    {
-      case 0xA8: case 0xB8:
-      case 0xC0 ... 0xFF:
-        ++u[0]; break;
-    }
-    // https://ru.wikipedia.org/wiki/MacCyrillic
-    switch ( *p )
-    {
-      case 0x80 ... 0x9F:
-      case 0xDD ... 0xFE:
-        ++u[3]; break;
-    }
-    // https://ru.wikipedia.org/wiki/ISO_8859-5
-    switch ( *p )
-    {
-      case 0xA1: case 0xF1:
-      case 0xB0 ... 0xEF:
-        ++u[4]; break;
+      for ( UINT i = 0; i < kNCyrillicTables; ++i )
+      {
+        const WCHAR w = g_ctCyrillicTables[i][ (*p) & 0x7f ];
+      }
     }
     ++p; --n;
   }
   UINT k=0;
-  for ( UINT i=1; i<5; ++i ) { if ( u[i] > u[k] ) k = i; }
-  return pOut[k];
+  for ( UINT i = 1; i < kNCyrillicTables; ++i )
+  {
+    if ( u[i] > u[k] )
+    {
+      k = i;
+    }
+  }
+  return k;
 }
 
 
@@ -101,7 +69,7 @@ LPCSTR rGetCodePage ( BYTE const * p, UINT n )
           +1 * sizeof(WCHAR)    размер строки с конечным нулём
           +2 * sizeof(WCHAR)    размер всех данных
     w7... +1                    указатель на строку с конечным нулём
-    w7...[w7...[0]]             последний символ (не ноль)
+    w7...[w7...[0]   ]          последний символ (не ноль)
                   +1            ноль
 */
 static UINT rW7_vsetf ( const LPWSTR w7Dst, const LPCWSTR wszFormat, va_list args )
@@ -528,36 +496,37 @@ static UINT rParseFile ( )
 
 INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 {
-  printf ( "setlocale: %s\n", setlocale ( LC_ALL, "" ) );
-  pF = rOpenFileToWriteWith_UTF16_BOM ( L"out.log" );
-  pF_S = rOpenFileToWriteWith_UTF16_BOM ( L"sections.log" );
-  pF_M = rOpenFileToWriteWith_UTF16_BOM ( L"methods.log" );
-  pF_O = rOpenFileToWriteWith_UTF16_BOM ( L"table.log" );
-  fwprintf ( pF, L"ARGC >> %d\n", argc );
-  for ( UINT i = 0; i < argc; ++i )
-  { fwprintf ( pF, L"ARGV[%d] >> %s\n", i, argv[i] ); }
-  for ( UINT i = 0; envp[i]; ++i )
-  { fwprintf ( pF, L"ENVP[%d] >> %s\n", i, envp[i] ); }
+  printf("0x%x 0x%x 0x%x 0x%x\n", 'А', 'а', L'А', L'а' );
+  // printf ( "setlocale: %s\n", setlocale ( LC_ALL, "" ) );
+  // pF = rOpenFileToWriteWith_UTF16_BOM ( L"out.log" );
+  // pF_S = rOpenFileToWriteWith_UTF16_BOM ( L"sections.log" );
+  // pF_M = rOpenFileToWriteWith_UTF16_BOM ( L"methods.log" );
+  // pF_O = rOpenFileToWriteWith_UTF16_BOM ( L"table.log" );
+  // fwprintf ( pF, L"ARGC >> %d\n", argc );
+  // for ( UINT i = 0; i < argc; ++i )
+  // { fwprintf ( pF, L"ARGV[%d] >> %s\n", i, argv[i] ); }
+  // for ( UINT i = 0; envp[i]; ++i )
+  // { fwprintf ( pF, L"ENVP[%d] >> %s\n", i, envp[i] ); }
 
-  if ( argc == 1 )
-  {
-    rW7_set ( w7Path, L"\\\\NAS\\Public\\common\\Gilyazeev\\ГИС\\Искринское м-е" );
-    // rW7_set ( w7Path, L"F:\\ARGilyazeev\\github\\Ag47\\t_data" );
+  // if ( argc == 1 )
+  // {
+  //   rW7_set ( w7Path, L"\\\\NAS\\Public\\common\\Gilyazeev\\ГИС\\Искринское м-е" );
+  //   // rW7_set ( w7Path, L"F:\\ARGilyazeev\\github\\Ag47\\t_data" );
 
-    rParseFile();
-  }
-  else
-  for ( UINT i = 1; i < argc; ++i )
-  {
-    rW7_set ( w7Path, argv[i] );
-    rParseFile();
-  }
+  //   rParseFile();
+  // }
+  // else
+  // for ( UINT i = 1; i < argc; ++i )
+  // {
+  //   rW7_set ( w7Path, argv[i] );
+  //   rParseFile();
+  // }
 
-  printf ( "%d\n", atoi ( "   1312093saodakskdo") );
+  // printf ( "%d\n", atoi ( "   1312093saodakskdo") );
 
-  fclose ( pF_O );
-  fclose ( pF_M );
-  fclose ( pF_S );
-  fclose ( pF );
+  // fclose ( pF_O );
+  // fclose ( pF_M );
+  // fclose ( pF_S );
+  // fclose ( pF );
   return 0;
 }
