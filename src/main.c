@@ -12,16 +12,9 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#define kPathMaxLen 2048
-
-static FILE * pF = NULL;
-static FILE * pF_S = NULL;
-static FILE * pF_M = NULL;
-static FILE * pF_O = NULL;
-static WCHAR w7Path [ kPathMaxLen ];
-
 #include "cyrillic.c"
 
+#define kPathMaxLen 512
 
 static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
 {
@@ -61,6 +54,42 @@ UINT rGetCodePage ( BYTE const * p, UINT n )
   return k;
 }
 
+/*
+  Функция загрузки файла в память
+  @ p                   указатель на блок памяти размера как минимум n+1
+  @ wsz                 путь к файлу
+  @ n                   размер файла
+*/
+static PBYTE rLoadFile ( const PBYTE p, const LPCWSTR wsz, const UINT n )
+{
+  FILE * const fd = _wfopen ( wsz, L"rb" );
+  assert ( fd );
+  UINT N = 0;
+  while ( N < n )
+  {
+    N += fread ( p+N, 1, n-N, fd );
+  }
+  p[n]    = '\0';
+  fclose ( fd );
+  return p;
+}
+
+enum
+{
+  kBOM_Null = 0,
+  kBOM_UTF_8,
+  kBOM_UTF_16BE,
+  kBOM_UTF_16LE,
+};
+
+static UINT rGetBOM ( const PBYTE p )
+{
+  if ( p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF ) return kBOM_UTF_8;
+  if ( p[0] == 0xFE && p[1] == 0xFF ) return kBOM_UTF_16BE;
+  if ( p[0] == 0xFF && p[1] == 0xFE ) return kBOM_UTF_16LE;
+  return kBOM_Null;
+}
+
 
 /*
   @ w7...                       строка UTF16 хранящая длину строки первым символом и оканчивающаяся нулеым символом
@@ -84,6 +113,152 @@ static UINT rW7_addf ( const LPWSTR w7Dst, const LPCWSTR wszFormat, ... )
 { va_list args; va_start ( args, wszFormat ); const UINT i = rW7_vaddf ( w7Dst, wszFormat, args ); va_end ( args ); return i; }
 static UINT rW7_add ( const LPWSTR w7Dst, const LPCWSTR wszSrc )
 { return rW7_addf ( w7Dst, L"%s", wszSrc ); }
+static VOID rW7_PushSymbol ( const LPWSTR w7Dst, const WCHAR nSymbol )
+{ ++w7Dst[0]; w7Dst[w7Dst[0]] = nSymbol; w7Dst[w7Dst[0]+1] = L'\0'; }
+
+/*
+  @ v7...                       Вектор, т.е. массив переменной длины
+  UINT16[0]                     Количество выделенного места под элементы (в размерах элемента)
+  UINT16[1]                     Количество занятого места (в размерах элемента)
+  UINT16[2]                     Размер элемента (в байтах)
+  UINT16[3]                     неиспользуемое поле
+*/
+#define rV7_GetHeadPtr(v7) ((UINT16*)((UINT_PTR)(v7)-(sizeof(UINT16)*4)))
+// Выделяет место под вектор
+static LPVOID rV7_Alloc ( const UINT nElementSize, UINT nCount )
+{
+  if ( nCount == 0 ) { nCount = 4; }
+  UINT16 * const u = malloc ( (nElementSize*nCount) + (sizeof(UINT16)*4) );
+  u[0] = nCount;
+  u[1] = 0;
+  u[2] = nElementSize;
+  u[4] = 0xFEF0FEF0;
+  return (LPVOID)(u+4);
+}
+// Создаёт копию вектора
+static LPVOID rV7_Copy ( const LPVOID v7, UINT nCount )
+{
+  if ( nCount == 0 ) { nCount = rV7_GetHeadPtr ( v7 ) [1]; }
+  const LPVOID _v7 = rV7_Alloc ( rV7_GetHeadPtr ( v7 ) [2], nCount );
+  memcpy ( _v7, v7, rV7_GetHeadPtr ( v7 ) [2] );
+  return _v7;
+}
+// Освобождает вектор
+static VOID rV7_Free ( const LPVOID v7 )
+{
+  free ( rV7_GetHeadPtr ( v7 ) );
+}
+// Добавляет элемент в конец вектора
+static LPVOID rV7_Add ( const LPVOID v7, const LPVOID p )
+{
+  UINT16 * const u = rV7_GetHeadPtr ( v7 );
+  // Если неосталось места
+  if ( u[0] <= u[1] )
+  {
+    const LPVOID _v7 = rV7_Copy ( v7, u[0]*2 );
+    free ( v7 );
+    return rV7_Add ( _v7, p );
+  }
+  memcpy ( (LPVOID)( ((UINT_PTR)v7) + (u[1]*u[2]) ), p, u[2] );
+  return v7;
+}
+
+static UINT rLog ( const LPCWSTR fmt, ... )
+{
+  static FILE * pFLog = NULL;
+  if ( (!fmt) && (pFLog) ) { fclose ( pFLog ); pFLog = NULL; return 0; }
+  if ( !pFLog ) { pFLog = rOpenFileToWriteWith_UTF16_BOM ( L".ag47.log" ); }
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = vfwprintf ( pFLog, fmt, args );
+  va_end ( args );
+  return i;
+}
+
+static struct
+{
+  WCHAR * (w7PathIn[kPathMaxLen]);
+  WCHAR w7PathOut[kPathMaxLen];
+  BOOL bReCreate;
+} gScript;
+
+
+
+static UINT rParseScript ( WCHAR * p )
+{
+  UINT nLine = 1;
+  void _rSkipWs ( )
+  { while ( isspace ( *p ) ) { if ( *p == '\n' ) { ++nLine; } ++p; } }
+
+  _rSkipWs();
+  return 0;
+}
+
+static UINT rOpenScript ( const LPCWSTR wszFilePath )
+{
+  WIN32_FIND_DATA ffd;
+  {
+    HANDLE hFind;
+    hFind = FindFirstFile ( wszFilePath, &ffd );
+    if ( hFind == INVALID_HANDLE_VALUE )
+    {
+      rLog ( L"!ERROR: FindFirstFile (0x%X) (\"%s\")\n", (UINT)GetLastError(), wszFilePath );
+      return __LINE__;
+    }
+    FindClose ( hFind );
+  }
+  BYTE buf [ ffd.nFileSizeLow+1 ];
+  rLoadFile ( buf, wszFilePath, ffd.nFileSizeLow );
+  BYTE * p = buf;
+  if ( rGetBOM ( p ) == kBOM_UTF_8 )
+  {
+    p += 3;
+    ULONG n;
+    RtlUTF8ToUnicodeN ( NULL, (UINT)(-1), &n, (LPCSTR)buf, ffd.nFileSizeLow - 3 );
+    WCHAR wBuf [ n+1 ];
+    ULONG n2;
+    RtlUTF8ToUnicodeN ( wBuf, n+1, &n2, (LPCSTR)buf, ffd.nFileSizeLow - 3 );
+    wBuf [n] = L'\0';
+    return rParseScript ( wBuf );
+  }
+  rLog ( L"!ERROR: неизвестная кодировка файла скрипта (\"%s\")\n", wszFilePath );
+  return __LINE__;
+}
+
+static FILE * pFTree            = NULL;
+#if 0
+static UINT rLogTree ( const LPCWSTR fmt, ... )
+{
+  if ( (!fmt) && (pFTree) )
+  {
+    fclose ( pFTree );
+    pFTree = NULL;
+  }
+  if ( !pFTree )
+  {
+    WCHAR w7[kPathMaxLen];
+    rW7_addf ( w7, L"/" )
+    pFTree = _wfopen (  );
+  }
+}
+#endif
+static FILE * pFSection         = NULL;
+static FILE * pFMethods         = NULL;
+static FILE * pFTable           = NULL;
+static FILE * pFCopy            = NULL;
+static FILE * pFErros           = NULL;
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -111,6 +286,17 @@ static UINT rW7_add ( const LPWSTR w7Dst, const LPCWSTR wszSrc )
 #define D7PRNT_EL(a) D7PRNT_E(L"(Line %u) %s\n",nLine,a)
 #define D7_LAS_SET_nD(i) nD[i] = (LONG_PTR)(p)-(LONG_PTR)(pD[i]);
 #define D7_TRIM_LAST_SPACE(_pD,_nD) while ( (_nD) && D7_IF_SPACE((_pD)[_nD-1]) ) { --(_nD); }
+
+static FILE * pF = NULL;
+static FILE * pF_S = NULL;
+static FILE * pF_M = NULL;
+static FILE * pF_O = NULL;
+
+// Обрабатываемый путь
+static WCHAR w7Path [ kPathMaxLen ];
+
+
+
 
 /* Разбор данных LAS */
 static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
@@ -350,20 +536,7 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
   return;
 }
 
-/* Загрузка файла в память */
-static PBYTE rLoadFile ( const PBYTE pData, const LPCWSTR wszFileName, const UINT nFileSize )
-{
-  FILE * const fd = _wfopen ( wszFileName, L"rb" );
-  assert ( fd );
-  DWORD n = 0;
-  while ( n < nFileSize )
-  {
-    n += fread ( pData+n, 1, nFileSize-n, fd );
-  }
-  pData[nFileSize] = '\0';
-  fclose ( fd );
-  return pData;
-}
+
 
 /* Парсим внутринности архива */
 static UINT rParseArchive ( struct archive * const ar )
@@ -477,8 +650,8 @@ static UINT rParseFFD ( WIN32_FIND_DATA const * const pFFD )
   return 0;
 }
 
-/* Разбирает указаные в пути */
-static UINT rParseFile ( )
+/* Разбирает указаный в w7Path путь */
+static UINT rParsePath ( )
 {
   WIN32_FIND_DATA ffd;
   HANDLE hFind;
@@ -510,7 +683,6 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 
   // if ( argc == 1 )
   // {
-  //   rW7_set ( w7Path, L"\\\\NAS\\Public\\common\\Gilyazeev\\ГИС\\Искринское м-е" );
   //   // rW7_set ( w7Path, L"F:\\ARGilyazeev\\github\\Ag47\\t_data" );
 
   //   rParseFile();

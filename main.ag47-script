@@ -1,0 +1,10 @@
+﻿
+
+  PATH_IN  = [
+    ".\t_data\2007г",
+    ".\t_data\2012г",
+    ".\t_data"      ,
+  ];
+
+  PATH_OUT =
+    ".\t_data";
