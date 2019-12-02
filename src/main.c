@@ -485,22 +485,22 @@ static UINT rScriptParse ( LPWSTR p )
     void _rLogVW7 ( const LPCWSTR wsz, LPWSTR * v7 )
     {
       if ( !v7 ) {
-        rLog ( L"~ %-16s = NULL\n", wsz );
+        rLog ( L"~ %s = NULL\n", wsz );
         return;
       }
       const UINT n = rV7_GetSize ( v7 );
-      rLog ( L"~ %-16s = [%d]\n", wsz, n );
+      rLog ( L"~ %s = [%d]\n", wsz, n );
       for ( UINT i = 0; i < n; ++i )
-      { rLog ( L"~ %-16s[%d] = \"%s\"\n", wsz, i, v7[i]+1 ); }
+      { rLog ( L"~ %s[%d] = \"%s\"\n", wsz, i, v7[i]+1 ); }
     }
     void _rLogW7 ( const LPCWSTR wsz, LPWSTR w7 )
     {
-      rLog ( L"~ %-16s = \"%s\"\n", wsz, w7+1 );
+      rLog ( L"~ %s = \"%s\"\n", wsz, w7+1 );
     }
     void _rLogBool ( const LPCWSTR szT, const LPCWSTR szF, const BOOL b )
     {
-      if ( b && szT ) { rLog ( L"~ %-16s\n", szT ); }
-      if ( !b && szF ) { rLog ( L"~ %-16s\n", szF ); }
+      if ( b && szT ) { rLog ( L"~ %s\n", szT ); }
+      if ( !b && szF ) { rLog ( L"~ %s\n", szF ); }
     }
 
   P_Ok:
