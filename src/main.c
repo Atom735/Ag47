@@ -275,6 +275,11 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
           if ( !D7_IF_DESC ( "METHOD" ) )
           { pD[4] = pD[3]; nD[4] = nD[3]; }
         }
+        else
+        if ( D7_IF_MNEM ( "WELL" ) )
+        {
+
+        }
         break;
       case 'C':
         // Находим методы ГИС
@@ -537,6 +542,8 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
   if ( argc == 1 )
   {
     rW7_set ( w7Path, L"\\\\NAS\\Public\\common\\Gilyazeev\\ГИС\\Искринское м-е" );
+    // rW7_set ( w7Path, L"F:\\ARGilyazeev\\github\\Ag47\\t_data" );
+
     rParseFile();
   }
   else
