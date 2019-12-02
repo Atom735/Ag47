@@ -39,6 +39,10 @@ UINT rGetCodePage ( BYTE const * p, UINT n )
       for ( UINT i = 0; i < kNCyrillicTables; ++i )
       {
         const WCHAR w = g_ctCyrillicTables[i][ (*p) & 0x7f ];
+        if ( w >= 0x410 && w <= 0x44F )
+        {
+          u[i] += g_nCyrillicPeriodTable[(w<0x430)?(w-0x410):(w-0x430)];
+        }
       }
     }
     ++p; --n;
@@ -72,6 +76,68 @@ static PBYTE rLoadFile ( const PBYTE p, const LPCWSTR wsz, const UINT n )
   p[n]    = '\0';
   fclose ( fd );
   return p;
+}
+
+static UINT rUTF8_GetLength ( BYTE const * p, UINT n )
+{
+  UINT i = 0;
+  while ( n )
+  {
+    if ( *p & 0x80 )
+    {
+      if ( ((*p) & (0xff<<5)) == ((*p) & (0xff<<6)) )
+      { p += 2; n -= 2; ++i; }
+      else
+      if ( ((*p) & (0xff<<4)) == ((*p) & (0xff<<5)) )
+      { p += 3; n -= 3; ++i; }
+      else
+      if ( ((*p) & (0xff<<3)) == ((*p) & (0xff<<4)) )
+      { p += 4; n -= 4; ++i; }
+      else
+      { abort (); }
+    }
+    else
+    {
+      ++p; --n; ++i;
+    }
+  }
+  return i;
+}
+static UINT rUTF8_ToWide ( BYTE const * p, UINT n, WCHAR * wsz )
+{
+  UINT i = 0;
+  while ( n )
+  {
+    if ( *p & 0x80 )
+    {
+      if ( ((*p) & (0xff<<5)) == ((*p) & (0xff<<6)) )
+      {
+        *wsz = (((p[0])&(0xff>>3))<<6) | (((p[1])&(0xff>>2))<<0); ++wsz;
+        p += 2; n -= 2; ++i;
+      }
+      else
+      if ( ((*p) & (0xff<<4)) == ((*p) & (0xff<<5)) )
+      {
+        *wsz = (((p[0])&(0xff>>4))<<12) | (((p[1])&(0xff>>2))<<6) | (((p[2])&(0xff>>2))<<0); ++wsz;
+        p += 3; n -= 3; ++i;
+      }
+      else
+      if ( ((*p) & (0xff<<3)) == ((*p) & (0xff<<4)) )
+      {
+        *wsz = (((p[0])&(0xff>>5))<<18) | (((p[1])&(0xff>>2))<<12) | (((p[2])&(0xff>>2))<<6) | (((p[3])&(0xff>>2))<<0); ++wsz;
+        p += 4; n -= 4; ++i;
+      }
+      else
+      { abort (); }
+    }
+    else
+    {
+      *wsz = *p; ++wsz;
+      ++p; --n; ++i;
+    }
+  }
+  *wsz = 0;
+  return i;
 }
 
 enum
@@ -115,6 +181,8 @@ static UINT rW7_add ( const LPWSTR w7Dst, const LPCWSTR wszSrc )
 { return rW7_addf ( w7Dst, L"%s", wszSrc ); }
 static VOID rW7_PushSymbol ( const LPWSTR w7Dst, const WCHAR nSymbol )
 { ++w7Dst[0]; w7Dst[w7Dst[0]] = nSymbol; w7Dst[w7Dst[0]+1] = L'\0'; }
+static LPWSTR rW7_Alloc ( const UINT n ) { return (LPWSTR) malloc ( (n+2) * sizeof(WCHAR) ); }
+static VOID rW7_Free ( const LPWSTR w7 ) { free ( w7 ); }
 
 /*
   @ v7...                       Вектор, т.е. массив переменной длины
@@ -124,6 +192,11 @@ static VOID rW7_PushSymbol ( const LPWSTR w7Dst, const WCHAR nSymbol )
   UINT16[3]                     неиспользуемое поле
 */
 #define rV7_GetHeadPtr(v7) ((UINT16*)((UINT_PTR)(v7)-(sizeof(UINT16)*4)))
+
+static UINT rV7_GetSize ( VOID const * const v7 )
+{
+  return rV7_GetHeadPtr(v7)[1];
+}
 // Выделяет место под вектор
 static LPVOID rV7_Alloc ( const UINT nElementSize, UINT nCount )
 {
@@ -132,8 +205,14 @@ static LPVOID rV7_Alloc ( const UINT nElementSize, UINT nCount )
   u[0] = nCount;
   u[1] = 0;
   u[2] = nElementSize;
-  u[4] = 0xFEF0FEF0;
-  return (LPVOID)(u+4);
+  u[4] = 0xFEF0;
+  const LPVOID o = (LPVOID)(u+4);
+  memset ( o, 0, u[0]*u[2] );
+  return o;
+}
+static LPWSTR * rV7_Alloc_W7 ( UINT nCount )
+{
+  return rV7_Alloc ( sizeof(WCHAR), nCount );
 }
 // Создаёт копию вектора
 static LPVOID rV7_Copy ( const LPVOID v7, UINT nCount )
@@ -148,6 +227,15 @@ static VOID rV7_Free ( const LPVOID v7 )
 {
   free ( rV7_GetHeadPtr ( v7 ) );
 }
+static VOID rV7_Free_W7 ( LPWSTR * const v7 )
+{
+  const UINT n = rV7_GetSize ( v7 );
+  for ( UINT i = 0; i < n; ++i )
+  {
+    if ( v7[i] ) rW7_Free ( v7[i] );
+  }
+  rV7_Free ( v7 );
+}
 // Добавляет элемент в конец вектора
 static LPVOID rV7_Add ( const LPVOID v7, const LPVOID p )
 {
@@ -160,8 +248,11 @@ static LPVOID rV7_Add ( const LPVOID v7, const LPVOID p )
     return rV7_Add ( _v7, p );
   }
   memcpy ( (LPVOID)( ((UINT_PTR)v7) + (u[1]*u[2]) ), p, u[2] );
+  ++u[1];
   return v7;
 }
+
+
 
 static UINT rLog ( const LPCWSTR fmt, ... )
 {
@@ -177,25 +268,258 @@ static UINT rLog ( const LPCWSTR fmt, ... )
 
 static struct
 {
-  WCHAR * (w7PathIn[kPathMaxLen]);
-  WCHAR w7PathOut[kPathMaxLen];
-  BOOL bReCreate;
-} gScript;
+  LPWSTR *              vw7PathIn;
+  LPWSTR *              vw7PostfixLas;
+  LPWSTR *              vw7PostfixIncl;
+  LPWSTR *              vw7PostfixAr;
+  LPWSTR                w7PathOut;
+  BOOL                  bReCreate;
+} gScript = {};
 
-
-
-static UINT rParseScript ( WCHAR * p )
+static VOID rScriptRelease ( )
 {
-  UINT nLine = 1;
-  void _rSkipWs ( )
-  { while ( isspace ( *p ) ) { if ( *p == '\n' ) { ++nLine; } ++p; } }
+  if ( gScript.vw7PathIn )
+  {
+    rV7_Free_W7 ( gScript.vw7PathIn );
+    gScript.vw7PathIn = NULL;
+  }
+  if ( gScript.vw7PostfixLas )
+  {
+    rV7_Free_W7 ( gScript.vw7PostfixLas );
+    gScript.vw7PostfixLas = NULL;
+  }
+  if ( gScript.vw7PostfixIncl )
+  {
+    rV7_Free_W7 ( gScript.vw7PostfixIncl );
+    gScript.vw7PostfixIncl = NULL;
+  }
+  if ( gScript.vw7PostfixAr )
+  {
+    rV7_Free_W7 ( gScript.vw7PostfixAr );
+    gScript.vw7PostfixAr = NULL;
+  }
 
-  _rSkipWs();
-  return 0;
+  if ( gScript.w7PathOut )
+  {
+    rW7_Free ( gScript.w7PathOut );
+    gScript.w7PathOut = NULL;
+  }
 }
 
-static UINT rOpenScript ( const LPCWSTR wszFilePath )
+static VOID rScriptInit ( )
 {
+  rScriptRelease ( );
+  gScript.bReCreate = FALSE;
+}
+
+static UINT rScriptParse ( LPWSTR p )
+{
+  rScriptInit();
+  UINT nLine = 1;
+  UINT nError;
+  VOID _rSkipWs ( )
+  {
+    while ( isspace ( *p ) )
+    {
+      if ( *p == '\n' ) { ++nLine; }
+      ++p;
+    }
+  }
+  VOID _rSkipToNewLine ( )
+  {
+    while ( *p != '\n' && *p ) { ++p; }
+    if ( *p == '\n' ) { ++nLine; ++p; }
+  }
+  VOID _rSkipComment ( )
+  {
+    while ( *p )
+    {
+      if ( *p == '\n' ) { ++nLine; }
+      if ( *p == '*' && p[1] == '/' ) { p += 2; return; }
+      ++p;
+    }
+  }
+  UINT _rCmp ( LPCSTR wsz )
+  {
+    UINT i = 0;
+    while ( *wsz )
+    {
+      if ( p[i] != *wsz ) { return 0; }
+      ++i; ++wsz;
+    }
+    if ( isalnum ( p[i] ) ) { return 0; }
+    return i;
+  }
+  UINT _rGetStringSize ( )
+  {
+    UINT i = 0;
+    while ( p[i] != '\"' && p[i] ) { ++i; }
+    return i;
+  }
+
+  UINT _rValArrayOfStrings ( LPWSTR ** val )
+  {
+    _rSkipWs ( );
+    if ( *p != '=' ) { return __LINE__; }
+    ++p;
+    _rSkipWs ( );
+    if ( *p != '[' ) { return __LINE__; }
+    ++p;
+
+    if ( *val )
+    {
+      rV7_Free_W7 ( *val );
+      *val = NULL;
+    }
+    *val = rV7_Alloc_W7 ( 0 );
+
+    while ( TRUE )
+    {
+      LPWSTR w7;
+      _rSkipWs ( );
+      switch ( *p )
+      {
+        case 0:
+          return __LINE__;
+        case '\"':
+        {
+          ++p;
+          const UINT nTemp = _rGetStringSize ( );
+          w7 = rW7_Alloc ( nTemp );
+          p[nTemp] = 0;
+          rW7_set ( w7, p );
+          *val = rV7_Add ( *val, &w7 );
+          p += nTemp;
+          ++p;
+          _rSkipWs ( );
+          if ( *p == ',' ) { ++p; continue; }
+          if ( *p != ']' ) { return __LINE__; }
+          continue;
+        }
+        case ']':
+          ++p;
+          _rSkipWs ( );
+          if ( *p != ';' ) { return __LINE__; }
+          ++p;
+          return 0;
+      }
+    }
+  }
+
+  UINT _rValString ( LPWSTR * pw7 )
+  {
+    _rSkipWs ( );
+    if ( *p != '=' ) { return __LINE__; }
+    ++p;
+    _rSkipWs ( );
+    if ( *p != '\"' ) { return __LINE__; }
+    ++p;
+    const UINT nTemp = _rGetStringSize ( );
+    if ( *pw7 )
+    {
+      rW7_Free ( *pw7 );
+      *pw7 = NULL;
+    }
+    *pw7 = rW7_Alloc ( nTemp );
+    p[nTemp] = 0;
+    rW7_set ( *pw7, p );
+    p += nTemp;
+    ++p;
+    _rSkipWs ( );
+    if ( *p != ';' ) { return __LINE__; }
+    ++p;
+    return 0;
+  }
+
+  UINT _rValNull ( )
+  {
+    _rSkipWs ( );
+    if ( *p != ';' ) { return __LINE__; }
+    ++p;
+    return 0;
+  }
+
+  UINT _rValName ( )
+  {
+    UINT nTemp;
+
+    if ( ( nTemp = _rCmp ( "PATH_IN" ) ) ) { p += nTemp; if ( ( nTemp = _rValArrayOfStrings ( &(gScript.vw7PathIn) ) ) ) { return nTemp; } return 0; }
+    if ( ( nTemp = _rCmp ( "FORMAT_LAS" ) ) ) { p += nTemp; if ( ( nTemp = _rValArrayOfStrings ( &(gScript.vw7PostfixLas) ) ) ) { return nTemp; } return 0; }
+    if ( ( nTemp = _rCmp ( "FORMAT_INCL" ) ) ) { p += nTemp; if ( ( nTemp = _rValArrayOfStrings ( &(gScript.vw7PostfixIncl) ) ) ) { return nTemp; } return 0; }
+    if ( ( nTemp = _rCmp ( "FORMAT_AR" ) ) ) { p += nTemp; if ( ( nTemp = _rValArrayOfStrings ( &(gScript.vw7PostfixAr) ) ) ) { return nTemp; } return 0; }
+
+    if ( ( nTemp = _rCmp ( "PATH_OUT" ) ) ) { p += nTemp; if ( ( nTemp = _rValString ( &(gScript.w7PathOut) ) ) ) { return nTemp; } return 0; }
+
+    if ( ( nTemp = _rCmp ( "RECREATE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = TRUE; return 0; }
+    if ( ( nTemp = _rCmp ( "NORECREATE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = FALSE; return 0; }
+
+    return __LINE__;
+  }
+
+  {
+    UINT nTemp;
+    while ( TRUE )
+    {
+      _rSkipWs();
+      switch ( *p )
+      {
+        case '/':
+          if ( p[1] == '/' ) { p += 2; _rSkipToNewLine(); continue; }
+          if ( p[1] == '*' ) { p += 2; _rSkipComment(); continue; }
+          nError = __LINE__; goto P_Error;
+        case 'A' ... 'Z':
+        case 'a' ... 'z':
+          if ( ( nTemp = _rValName() ) ) { nError = nTemp; goto P_Error; }
+          continue;
+        case 0:
+          goto P_Ok;
+        default:
+          nError = __LINE__; goto P_Error;
+      }
+    }
+  }
+  P_Error:
+    rLog ( L"!ERROR: [%u] Ошибка синтаксиса (Line in script %u)\n", nError, nLine );
+    return nError;
+
+    void _rLogVW7 ( const LPCWSTR wsz, LPWSTR * v7 )
+    {
+      if ( !v7 ) {
+        rLog ( L"~ %-16s = NULL\n", wsz );
+        return;
+      }
+      const UINT n = rV7_GetSize ( v7 );
+      rLog ( L"~ %-16s = [%d]\n", wsz, n );
+      for ( UINT i = 0; i < n; ++i )
+      { rLog ( L"~ %-16s[%d] = \"%s\"\n", wsz, i, v7[i]+1 ); }
+    }
+    void _rLogW7 ( const LPCWSTR wsz, LPWSTR w7 )
+    {
+      rLog ( L"~ %-16s = \"%s\"\n", wsz, w7+1 );
+    }
+    void _rLogBool ( const LPCWSTR szT, const LPCWSTR szF, const BOOL b )
+    {
+      if ( b && szT ) { rLog ( L"~ %-16s\n", szT ); }
+      if ( !b && szF ) { rLog ( L"~ %-16s\n", szF ); }
+    }
+
+  P_Ok:
+
+    // _rLogVW7  ( L"PATH_IN", gScript.vw7PathIn );
+    _rLogVW7  ( L"FORMAT_LAS", gScript.vw7PostfixLas );
+    _rLogVW7  ( L"FORMAT_INCL", gScript.vw7PostfixIncl );
+    _rLogVW7  ( L"FORMAT_AR", gScript.vw7PostfixAr );
+
+    _rLogW7   ( L"PATH_OUT", gScript.w7PathOut );
+
+    _rLogBool ( L"RECREATE", L"NORECREATE", gScript.bReCreate );
+
+    return 0;
+}
+
+static UINT rScriptOpen ( const LPCWSTR wszFilePath )
+{
+  rLog ( L"Скрипт (\"%s\")\n", wszFilePath );
   WIN32_FIND_DATA ffd;
   {
     HANDLE hFind;
@@ -213,13 +537,11 @@ static UINT rOpenScript ( const LPCWSTR wszFilePath )
   if ( rGetBOM ( p ) == kBOM_UTF_8 )
   {
     p += 3;
-    ULONG n;
-    RtlUTF8ToUnicodeN ( NULL, (UINT)(-1), &n, (LPCSTR)buf, ffd.nFileSizeLow - 3 );
+    UINT n = rUTF8_GetLength ( p, ffd.nFileSizeLow - 3 );
     WCHAR wBuf [ n+1 ];
-    ULONG n2;
-    RtlUTF8ToUnicodeN ( wBuf, n+1, &n2, (LPCSTR)buf, ffd.nFileSizeLow - 3 );
-    wBuf [n] = L'\0';
-    return rParseScript ( wBuf );
+    UINT n2 = rUTF8_ToWide ( p, ffd.nFileSizeLow - 3, wBuf );
+    wBuf[n2] = L'\0';
+    return rScriptParse ( wBuf );
   }
   rLog ( L"!ERROR: неизвестная кодировка файла скрипта (\"%s\")\n", wszFilePath );
   return __LINE__;
@@ -302,10 +624,10 @@ static WCHAR w7Path [ kPathMaxLen ];
 static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
 {
   {
-    const LPCSTR lc = rGetCodePage ( pData, nSize );
-    setlocale ( LC_ALL, lc );
-    D7PRNTF ( L"~ Размер файла: %d KiB\n", nSize/1024 );
-    D7PRNTF ( L"~ Кодировка: CP%hs\n", lc );
+    // const LPCSTR lc = rGetCodePage ( pData, nSize );
+    // setlocale ( LC_ALL, lc );
+    // D7PRNTF ( L"~ Размер файла: %d KiB\n", nSize/1024 );
+    // D7PRNTF ( L"~ Кодировка: CP%hs\n", lc );
   }
   BYTE const * p = pData;       // Указатель на обрабатываемый байт
   UINT nLine = 1;               // Номер обрабатываемой линии
@@ -669,7 +991,10 @@ static UINT rParsePath ( )
 
 INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 {
-  printf("0x%x 0x%x 0x%x 0x%x\n", 'А', 'а', L'А', L'а' );
+  if ( argc == 1 )
+  {
+    return rScriptOpen ( L".ag47-script" );
+  }
   // printf ( "setlocale: %s\n", setlocale ( LC_ALL, "" ) );
   // pF = rOpenFileToWriteWith_UTF16_BOM ( L"out.log" );
   // pF_S = rOpenFileToWriteWith_UTF16_BOM ( L"sections.log" );
