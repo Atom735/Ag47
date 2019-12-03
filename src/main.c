@@ -809,7 +809,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
       double            v;
       UINT              i;
     };
-  } aSTRT, aSTOP, aSTEP, aNULL, aWELL, aMETD;
+  } aSTRT = { }, aSTOP = { }, aSTEP = { }, aNULL = { }, aWELL = { }, aMETD = { };
 
   struct
   {
@@ -849,6 +849,19 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     }
   }
 
+
+  UINT _rCmp ( BYTE const * pb, CHAR const * sz )
+  {
+    UINT i = 0;
+    while ( *sz )
+    {
+      if ( *pb != (BYTE)(*sz) ) { return 0; }
+      ++pb; ++sz; ++i;
+    }
+    if ( isalnum ( *pb ) ) { return 0; }
+    return i;
+  }
+
   P_SkipLine: // Переход на новую строку
     while ( n && !( *p == '\n' || *p == '\r' ) ) { ++p; --n; }
   P_State_NewLine: // Начало новой строки
@@ -874,8 +887,14 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
       }
     }
     else if ( *p == '#' ) { goto P_SkipLine; }
+    if ( iSection == 0 )
+    {
+      _rLog ( L"Некорректное начало LAS файла\n" );
+      _rLogS ( L"Некорректное начало LAS файла\n", TRUE );
+      rV7_Free ( aMethods );
+      return __LINE__;
+    }
     // Разбираем строку секции
-
     ////  MNEM
     aMNEM.n = n;
     aMNEM.p = p;
@@ -955,7 +974,72 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     aLine.n -= n;
 
     _rLogS ( L"", TRUE );
-    rLogSection ( L"%-16.*hs.%-16.*hs %-64.*hs%.*hs\n", aMNEM.n, aMNEM.p, aUNIT.n, aUNIT.p, aDATA.n, aDATA.p, aDESC.n, aDESC.p );
+    rLogSection ( L"%-16.*hs.%-16.*hs %-64.*hs:%-64.*hs %s\n", aMNEM.n, aMNEM.p, aUNIT.n, aUNIT.p, aDATA.n, aDATA.p, aDESC.n, aDESC.p, w7+1 );
+
+    #define D7_PARSER_VAL_SSSN(sz,val) \
+      if ( _rCmp ( aMNEM.p, sz ) )\
+      {\
+        LPSTR pp;\
+        val.v = strtod ( (LPCSTR)(aDATA.p), &pp );\
+        if ((LONG_PTR)pp != (LONG_PTR)aDATA.p)\
+        {\
+          val.p = aDATA.p;\
+          val.n = aDATA.n;\
+        }\
+        else\
+        {\
+          val.v = strtod ( (LPCSTR)(aDESC.p), &pp );\
+          if ((LONG_PTR)pp != (LONG_PTR)aDESC.p)\
+          {\
+            val.p = aDESC.p;\
+            val.n = aDESC.n;\
+          }\
+          else\
+          {\
+            val.p = NULL;\
+            val.n = 0;\
+            _rLog ( L"Неудалось получить значение " TEXT(sz) L"\n" );\
+          }\
+        }\
+      }
+
+    D7_PARSER_VAL_SSSN("STRT",aSTRT)
+    else
+    D7_PARSER_VAL_SSSN("STOP",aSTRT)
+    else
+    D7_PARSER_VAL_SSSN("STEP",aSTRT)
+    else
+    D7_PARSER_VAL_SSSN("NULL",aSTRT)
+    else
+    if ( _rCmp ( aMNEM.p, "WELL" ) )
+    {
+      if ( _rCmp ( aDATA.p, "WELL" ) || aDATA.n == 0 )
+      {
+        aWELL.p = aDESC.p;
+        aWELL.n = aDESC.n;
+      }
+      else
+      {
+        aWELL.p = aDATA.p;
+        aWELL.n = aDATA.n;
+      }
+    }
+    else
+    if ( _rCmp ( aMNEM.p, "METD" ) )
+    {
+      if ( _rCmp ( aDATA.p, "METHOD" ) || aDATA.n == 0 )
+      {
+        aMETD.p = aDESC.p;
+        aMETD.n = aDESC.n;
+      }
+      else
+      {
+        aMETD.p = aDATA.p;
+        aMETD.n = aDATA.n;
+      }
+    }
+
+
 
     goto P_SkipLine;
 
@@ -1220,10 +1304,6 @@ static UINT rScriptParse ( LPWSTR p )
   rScriptInit();
   UINT nLine = 1;
   UINT nError;
-
-
-
-
 
   VOID _rSkipToNewLine ( )
   {
