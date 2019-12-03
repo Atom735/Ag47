@@ -251,6 +251,20 @@ static LPVOID rV7_Add ( const LPVOID v7, const LPVOID p )
   ++u[1];
   return v7;
 }
+static LPWSTR * rV7_Add_W7 ( LPWSTR * const v7, LPWSTR w7 )
+{
+  UINT16 * const u = rV7_GetHeadPtr ( v7 );
+  // Если неосталось места
+  if ( u[0] <= u[1] )
+  {
+    const LPVOID _v7 = rV7_Copy ( v7, u[0]*2 );
+    free ( v7 );
+    return rV7_Add_W7 ( _v7, w7 );
+  }
+  v7[u[1]] = w7;
+  ++u[1];
+  return v7;
+}
 
 
 static UINT rLog_v ( const LPCWSTR fmt, va_list args )
@@ -270,7 +284,7 @@ static UINT rLog ( const LPCWSTR fmt, ... )
   return i;
 }
 
-static UINT rLog_Error ( const LPCWSTR fmt, ...  )
+static UINT rLog_Error ( const LPCWSTR fmt, ... )
 {
   rLog ( L"!ERROR: " );
   va_list args;
@@ -278,6 +292,20 @@ static UINT rLog_Error ( const LPCWSTR fmt, ...  )
   UINT i = rLog_v ( fmt, args );
   va_end ( args );
   return i;
+}
+static UINT rLog_Error_WinAPI ( const LPCWSTR wszFuncName, const DWORD nErrorCode, const LPCWSTR fmt, ... )
+{
+  rLog_Error ( L"%s (0x%x) ", wszFuncName, nErrorCode );
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = rLog_v ( fmt, args );
+  va_end ( args );
+  WCHAR buf[kPathMaxLen*2];
+  FormatMessage ( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+          nErrorCode, MAKELANGID(LANG_RUSSIAN, SUBLANG_DEFAULT), buf, kPathMaxLen*2, NULL );
+  rLog_Error ( L" ==> %s", buf );
+  return i;
+
 }
 
 static struct
@@ -313,9 +341,10 @@ static UINT rEraseFolderTree ( const LPWSTR w7p )
         if ( ffd.cFileName[1] == '.' ) { if ( ffd.cFileName[2] == '\0' ) { continue; } }
       }
       const UINT n = rEraseFolderTree ( w7 ); if ( n ) { FindClose ( hFind ); return n; }
-      if(!RemoveDirectory ( w7 ))
+      if(!RemoveDirectory ( w7+1 ))
       {
-        rLog_Error ( L"RemoveDirectory (0x%X) (\"%s\") неизвестная ошибка\n", (UINT)GetLastError(), w7+1 );
+        const DWORD er = GetLastError();
+        rLog_Error_WinAPI ( L"RemoveDirectory", er, L" (\"%s\") неизвестная ошибка\n", w7+1 );
         FindClose ( hFind ); return __LINE__;
       }
     }
@@ -323,21 +352,21 @@ static UINT rEraseFolderTree ( const LPWSTR w7p )
     {
       if ( !DeleteFile ( w7+1 ) )
       {
-        const UINT er = (UINT)GetLastError();
+        const DWORD er = GetLastError();
         if ( er == ERROR_FILE_NOT_FOUND )
         {
-          rLog_Error ( L"DeleteFile (0x%X) (\"%s\") файл ненайден\n", er, w7+1 );
+          rLog_Error_WinAPI ( L"DeleteFile", er, L"(\"%s\") файл ненайден\n", w7+1 );
           FindClose ( hFind ); return __LINE__;
         }
         else
         if ( er == ERROR_ACCESS_DENIED )
         {
-          rLog_Error ( L"DeleteFile (0x%X) (\"%s\") нет доступа к файлу\n", er, w7+1 );
+          rLog_Error_WinAPI ( L"DeleteFile", er, L"(\"%s\") нет доступа к файлу\n", w7+1 );
           FindClose ( hFind ); return __LINE__;
         }
         else
         {
-          rLog_Error ( L"DeleteFile (0x%X) (\"%s\") неизвестная ошибка\n", er, w7+1 );
+          rLog_Error_WinAPI ( L"DeleteFile", er, L" (\"%s\") неизвестная ошибка\n", w7+1 );
           FindClose ( hFind ); return __LINE__;
         }
       }
@@ -346,63 +375,36 @@ static UINT rEraseFolderTree ( const LPWSTR w7p )
   FindClose ( hFind ); return 0;
 }
 
-static UINT rSriptPrepareToRun ( )
+static VOID rSriptPrepareToRun ( )
 {
   if ( !gScript.vw7PathIn ) { gScript.vw7PathIn = rV7_Alloc_W7 ( 0 ); }
   if ( rV7_GetSize ( gScript.vw7PathIn ) == 0 )
   {
     const LPWSTR wsz = rW7_Alloc ( 1 );
     rW7_set ( wsz, L"." );
-    rV7_Add ( gScript.vw7PathIn, wsz );
+    rV7_Add_W7 ( gScript.vw7PathIn, wsz );
   }
   if ( !gScript.vw7PostfixLas ) { gScript.vw7PostfixLas = rV7_Alloc_W7 ( 0 ); }
   if ( rV7_GetSize ( gScript.vw7PostfixLas ) == 0 )
   {
-    LPWSTR wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".las" ); rV7_Add ( gScript.vw7PostfixLas, wsz );
+    LPWSTR wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".las" ); rV7_Add_W7 ( gScript.vw7PostfixLas, wsz );
   }
   if ( !gScript.vw7PostfixIncl ) { gScript.vw7PostfixIncl = rV7_Alloc_W7 ( 0 ); }
   if ( rV7_GetSize ( gScript.vw7PostfixIncl ) == 0 )
   {
     LPWSTR wsz = NULL;
-    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".doc" ); rV7_Add ( gScript.vw7PostfixIncl, wsz );
-    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".txt" ); rV7_Add ( gScript.vw7PostfixIncl, wsz );
-    wsz = rW7_Alloc ( 5 ); rW7_set ( wsz, L".docx" );rV7_Add ( gScript.vw7PostfixIncl, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".doc" ); rV7_Add_W7 ( gScript.vw7PostfixIncl, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".txt" ); rV7_Add_W7 ( gScript.vw7PostfixIncl, wsz );
+    wsz = rW7_Alloc ( 5 ); rW7_set ( wsz, L".docx" );rV7_Add_W7 ( gScript.vw7PostfixIncl, wsz );
   }
   if ( !gScript.vw7PostfixAr ) { gScript.vw7PostfixAr = rV7_Alloc_W7 ( 0 ); }
   if ( rV7_GetSize ( gScript.vw7PostfixAr ) == 0 )
   {
     LPWSTR wsz = NULL;
-    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".zip" ); rV7_Add ( gScript.vw7PostfixAr, wsz );
-    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".rar" ); rV7_Add ( gScript.vw7PostfixAr, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".zip" ); rV7_Add_W7 ( gScript.vw7PostfixAr, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".rar" ); rV7_Add_W7 ( gScript.vw7PostfixAr, wsz );
   }
   if ( !gScript.w7PathOut ) { rW7_set ( gScript.w7PathOut = rW7_Alloc ( 5 ), L".ag47" ); }
-
-  // Пытаемся создать папку
-  if ( !CreateDirectory ( gScript.w7PathOut, NULL ) )
-  {
-    // Если не получилось создать папку
-    const UINT er = (UINT)GetLastError();
-    if ( er == ERROR_ALREADY_EXISTS )
-    {
-      // Папка существует, то если флаг RECREATE поднят, то удаляем всё что внутри
-      if ( gScript.bReCreate )
-      {
-        UINT n = rEraseFolderTree ( gScript.w7PathOut ); if ( n ) { return n; }
-      }
-    }
-    else
-    if ( er == ERROR_PATH_NOT_FOUND )
-    {
-      // Не существует пути к подпапке
-    }
-    else
-    {
-      // Другая ошибка
-      rLog_Error ( L"CreateDirectory (0x%X) (\"%s\") неизвестная ошибка\n", er, gScript.w7PathOut+1 );
-      return __LINE__;
-    }
-  }
-  return 0;
 }
 
 
@@ -433,9 +435,34 @@ static FILE * pFErros           = NULL;
 
 static UINT rScriptRun_Tree ( )
 {
-  UINT n;
-  if ( ( n = rSriptPrepareToRun ( ) ) ) { return n; }
   rLog ( L"~ script RUN_TREE\n" );
+
+  // Пытаемся создать папку
+  if ( !CreateDirectory ( gScript.w7PathOut+1, NULL ) )
+  {
+    // Если не получилось создать папку
+    const DWORD er = GetLastError();
+    if ( er == ERROR_ALREADY_EXISTS )
+    {
+      // Папка существует, то если флаг RECREATE поднят, то удаляем всё что внутри
+      if ( gScript.bReCreate )
+      {
+        const UINT n = rEraseFolderTree ( gScript.w7PathOut ); if ( n ) { return n; }
+      }
+    }
+    else
+    if ( er == ERROR_PATH_NOT_FOUND )
+    {
+      // Не существует пути к подпапке
+    }
+    else
+    {
+      // Другая ошибка
+      rLog_Error_WinAPI ( L"CreateDirectory", er, L"(\"%s\") неизвестная ошибка\n", gScript.w7PathOut+1 );
+      return __LINE__;
+    }
+  }
+
   return 0;
 }
 
@@ -480,14 +507,42 @@ static UINT rScriptParse ( LPWSTR p )
   rScriptInit();
   UINT nLine = 1;
   UINT nError;
-  VOID _rSkipWs ( )
+
+
+  void _rLogVW7 ( const LPCWSTR wsz, LPWSTR * v7 )
   {
-    while ( isspace ( *p ) )
-    {
-      if ( *p == '\n' ) { ++nLine; }
-      ++p;
+    if ( !v7 ) {
+      rLog ( L"~ %s = NULL\n", wsz );
+      return;
     }
+    const UINT n = rV7_GetSize ( v7 );
+    rLog ( L"~ %s = [%d]\n", wsz, n );
+    for ( UINT i = 0; i < n; ++i )
+    { rLog ( L"~ %s[%d] = \"%s\"\n", wsz, i, v7[i]+1 ); }
   }
+  void _rLogW7 ( const LPCWSTR wsz, LPWSTR w7 )
+  {
+    rLog ( L"~ %s = \"%s\"\n", wsz, w7+1 );
+  }
+  void _rLogBool ( const LPCWSTR szT, const LPCWSTR szF, const BOOL b )
+  {
+    if ( b && szT ) { rLog ( L"~ %s\n", szT ); }
+    if ( !b && szF ) { rLog ( L"~ %s\n", szF ); }
+  }
+
+  void _rLogAll ( )
+  {
+    _rLogVW7  ( L"PATH_IN", gScript.vw7PathIn );
+    _rLogVW7  ( L"FORMAT_LAS", gScript.vw7PostfixLas );
+    _rLogVW7  ( L"FORMAT_INCL", gScript.vw7PostfixIncl );
+    _rLogVW7  ( L"FORMAT_AR", gScript.vw7PostfixAr );
+
+    _rLogW7   ( L"PATH_OUT", gScript.w7PathOut );
+
+    _rLogBool ( L"RECREATE", L"NORECREATE", gScript.bReCreate );
+  }
+
+
   VOID _rSkipToNewLine ( )
   {
     while ( *p != '\n' && *p ) { ++p; }
@@ -500,6 +555,24 @@ static UINT rScriptParse ( LPWSTR p )
       if ( *p == '\n' ) { ++nLine; }
       if ( *p == '*' && p[1] == '/' ) { p += 2; return; }
       ++p;
+    }
+  }
+
+  VOID _rSkipWs ( )
+  {
+    while ( TRUE )
+    {
+      while ( isspace ( *p ) )
+      {
+        if ( *p == '\n' ) { ++nLine; }
+        ++p;
+      }
+      if ( *p == '/' )
+      {
+        if ( p[1] == '/' ) { p += 2; _rSkipToNewLine(); continue; }
+        if ( p[1] == '*' ) { p += 2; _rSkipComment(); continue; }
+      }
+      return;
     }
   }
   UINT _rCmp ( LPCSTR wsz )
@@ -551,7 +624,7 @@ static UINT rScriptParse ( LPWSTR p )
           w7 = rW7_Alloc ( nTemp );
           p[nTemp] = 0;
           rW7_set ( w7, p );
-          *val = rV7_Add ( *val, &w7 );
+          *val = rV7_Add_W7 ( *val, w7 );
           p += nTemp;
           ++p;
           _rSkipWs ( );
@@ -616,7 +689,8 @@ static UINT rScriptParse ( LPWSTR p )
     if ( ( nTemp = _rCmp ( "RECREATE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = TRUE; return 0; }
     if ( ( nTemp = _rCmp ( "NORECREATE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = FALSE; return 0; }
 
-    if ( ( nTemp = _rCmp ( "RUN_TREE" ) ) ) { p += nTemp; if ( ( nTemp = rScriptRun_Tree ( ) ) ) { return nTemp; } return 0; }
+    if ( ( nTemp = _rCmp ( "RUN_TREE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; }
+      rSriptPrepareToRun(); _rLogAll(); if ( ( nTemp = rScriptRun_Tree ( ) ) ) { return nTemp; } return 0; }
 
     return __LINE__;
   }
@@ -627,10 +701,6 @@ static UINT rScriptParse ( LPWSTR p )
       _rSkipWs();
       switch ( *p )
       {
-        case '/':
-          if ( p[1] == '/' ) { p += 2; _rSkipToNewLine(); continue; }
-          if ( p[1] == '*' ) { p += 2; _rSkipComment(); continue; }
-          nError = __LINE__; goto P_Error;
         case 'A' ... 'Z':
         case 'a' ... 'z':
           if ( ( nError = _rValName() ) ) { goto P_Error; }
@@ -646,37 +716,8 @@ static UINT rScriptParse ( LPWSTR p )
     rLog_Error ( L"[%u] Ошибка (Line in script %u)\n", nError, nLine );
     return nError;
 
-    void _rLogVW7 ( const LPCWSTR wsz, LPWSTR * v7 )
-    {
-      if ( !v7 ) {
-        rLog ( L"~ %s = NULL\n", wsz );
-        return;
-      }
-      const UINT n = rV7_GetSize ( v7 );
-      rLog ( L"~ %s = [%d]\n", wsz, n );
-      for ( UINT i = 0; i < n; ++i )
-      { rLog ( L"~ %s[%d] = \"%s\"\n", wsz, i, v7[i]+1 ); }
-    }
-    void _rLogW7 ( const LPCWSTR wsz, LPWSTR w7 )
-    {
-      rLog ( L"~ %s = \"%s\"\n", wsz, w7+1 );
-    }
-    void _rLogBool ( const LPCWSTR szT, const LPCWSTR szF, const BOOL b )
-    {
-      if ( b && szT ) { rLog ( L"~ %s\n", szT ); }
-      if ( !b && szF ) { rLog ( L"~ %s\n", szF ); }
-    }
 
   P_Ok:
-
-    _rLogVW7  ( L"PATH_IN", gScript.vw7PathIn );
-    _rLogVW7  ( L"FORMAT_LAS", gScript.vw7PostfixLas );
-    _rLogVW7  ( L"FORMAT_INCL", gScript.vw7PostfixIncl );
-    _rLogVW7  ( L"FORMAT_AR", gScript.vw7PostfixAr );
-
-    _rLogW7   ( L"PATH_OUT", gScript.w7PathOut );
-
-    _rLogBool ( L"RECREATE", L"NORECREATE", gScript.bReCreate );
 
     return 0;
 }
@@ -690,7 +731,7 @@ static UINT rScriptOpen ( const LPCWSTR wszFilePath )
     hFind = FindFirstFile ( wszFilePath, &ffd );
     if ( hFind == INVALID_HANDLE_VALUE )
     {
-      rLog_Error ( L"FindFirstFile (0x%X) (\"%s\")\n", (UINT)GetLastError(), wszFilePath );
+      rLog_Error_WinAPI ( L"FindFirstFile", GetLastError(), "(\"%s\")\n", wszFilePath );
       return __LINE__;
     }
     FindClose ( hFind );
