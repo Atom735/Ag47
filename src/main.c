@@ -16,6 +16,8 @@
 #include "cyrillic.c"
 #include "crc32.c"
 
+// [\x00-\x09\x0B-\x1f]
+
 #define kPathMaxLen 512
 UINT kFilesParsedPrint = 0xff;
 
@@ -57,6 +59,16 @@ static UINT rLog_Error ( const LPCWSTR fmt, ... )
   va_end ( args );
   return i;
 }
+
+static UINT rLog_Warn ( const LPCWSTR fmt, ... )
+{
+  rLog ( L"!WARN: " );
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = rLog_v ( fmt, args );
+  va_end ( args );
+  return i;
+}
 static UINT rLog_Error_WinAPI ( const LPCWSTR wszFuncName, const DWORD nErrorCode, const LPCWSTR fmt, ... )
 {
   rLog_Error ( L"%s (0x%x) ", wszFuncName, nErrorCode );
@@ -77,7 +89,7 @@ static UINT rLog_Error_WinAPI ( const LPCWSTR wszFuncName, const DWORD nErrorCod
   @ n                   количество данных
   @ return              номер кодировки из базы
 */
-UINT rGetCodePage ( BYTE const * p, UINT n )
+static UINT rGetCodePage ( BYTE const * p, UINT n )
 {
   UINT u[kNCyrillicTables] = { };
   while ( n )
@@ -342,27 +354,44 @@ enum
   kSSR_Parse,
 };
 
-
-
-
-
 static UINT rLogTree ( const LPCWSTR fmt, ... )
 {
-  static FILE * pFTree = NULL;
+  static FILE * pF = NULL;
   if ( !fmt )
   {
-    if ( pFTree ) { fclose ( pFTree ); pFTree = NULL; return 0; }
+    if ( pF ) { fclose ( pF ); pF = NULL; return 0; }
     return 0;
   }
-  if ( !pFTree )
+  if ( !pF )
   {
     WCHAR w7[kPathMaxLen];
     rW7_setf ( w7, L"%s/.ag47/_1.tree.log", gScript.w7PathOut+1 );
-    pFTree = rOpenFileToWriteWith_UTF16_BOM ( w7+1 );
+    pF = rOpenFileToWriteWith_UTF16_BOM ( w7+1 );
   }
   va_list args;
   va_start ( args, fmt );
-  UINT i = vfwprintf ( pFTree, fmt, args );
+  UINT i = vfwprintf ( pF, fmt, args );
+  va_end ( args );
+  return i;
+}
+
+static UINT rLogSection ( const LPCWSTR fmt, ... )
+{
+  static FILE * pF = NULL;
+  if ( !fmt )
+  {
+    if ( pF ) { fclose ( pF ); pF = NULL; return 0; }
+    return 0;
+  }
+  if ( !pF )
+  {
+    WCHAR w7[kPathMaxLen];
+    rW7_setf ( w7, L"%s/.ag47/_2.sections.log", gScript.w7PathOut+1 );
+    pF = rOpenFileToWriteWith_UTF16_BOM ( w7+1 );
+  }
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = vfwprintf ( pF, fmt, args );
   va_end ( args );
   return i;
 }
@@ -695,7 +724,12 @@ static UINT rScriptRun_Tree ( )
     if ( er == ERROR_ALREADY_EXISTS )
     {
       // Папка существует, то если флаг RECREATE поднят, то удаляем всё что внутри
-      if ( gScript.bReCreate ) { const UINT n = rEraseFolderTree ( gScript.w7PathOut ); if ( n ) { return n; } }
+      if ( gScript.bReCreate )
+      {
+        rLogTree ( NULL );
+        rLogSection ( NULL );
+        const UINT n = rEraseFolderTree ( gScript.w7PathOut ); if ( n ) { return n; }
+      }
     }
     else
     if ( er == ERROR_PATH_NOT_FOUND )
@@ -754,8 +788,182 @@ static UINT rScriptRun_Tree ( )
 }
 
 
-static UINT rParseLas ( const LPCWSTR w7, BYTE * p, UINT n )
+static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
 {
+  UINT nLine = 1;
+  BYTE iSection = 0;
+  const UINT iCP = rGetCodePage ( p, n );
+  setlocale ( LC_ALL, g_aszCyrillicTableLocaleNames[iCP] );
+
+  struct
+  {
+    BYTE const *        p;
+    UINT                n;
+  } aMNEM, aUNIT, aDATA, aDESC, aLine;
+
+  struct
+  {
+    BYTE const *        p;
+    UINT                n;
+    union {
+      double            v;
+      UINT              i;
+    };
+  } aSTRT, aSTOP, aSTEP, aNULL, aWELL, aMETD;
+
+  struct
+  {
+    BYTE const *        p;
+    UINT                n;
+    double              fA;
+    double              fB;
+  } * aMethods = rV7_Alloc ( sizeof(*aMethods), 0 );
+
+  BOOL _bLog = TRUE;
+  BOOL _bLogSecton = TRUE;
+  // Изначально находимся на новой строке, поэтому сразу переходим к выбору секции
+  goto P_State_NewLine;
+
+
+  VOID _rLog ( const LPCWSTR wsz )
+  {
+    if ( _bLog ) { rLog ( L"$ Разбор файла: %s\n", w7+1 ); _bLog = FALSE; }
+    UINT k = 0;
+    while ( aLine.p[k] && !( aLine.p[k] == '\n' || aLine.p[k] == '\r' ) ) { ++k; }
+    rLog_Warn ( L"(Line %u) ~%hc %s      ^ %.*hs\n", nLine, iSection, wsz, k, aLine.p );
+  }
+
+  VOID _rLogS ( const LPCWSTR wsz, const BOOL b )
+  {
+    if ( _bLogSecton )
+    {
+      rLogSection ( L"==> FILE = %s\n", w7+1 );
+      _bLogSecton = FALSE;
+    }
+    rLogSection ( L"(Line %u) ~%hc %s", nLine, iSection, wsz );
+    if ( b )
+    {
+      UINT k = 0;
+      while ( aLine.p[k] && !( aLine.p[k] == '\n' || aLine.p[k] == '\r' ) ) { ++k; }
+      rLogSection ( L"#~%hc %.*hs\n", iSection, k, aLine.p );
+    }
+  }
+
+  P_SkipLine: // Переход на новую строку
+    while ( n && !( *p == '\n' || *p == '\r' ) ) { ++p; --n; }
+  P_State_NewLine: // Начало новой строки
+    while ( n && ( *p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' ) )
+    {
+      if ( *p == '\n' ) { ++nLine; }
+       ++p; --n;
+    }
+    aLine.p = p;
+    aLine.n = n;
+    if ( n == 0 ) goto P_End;
+    // Начало секции
+    if ( *p == '~' )
+    {
+      switch ( p[1] )
+      {
+        case 'V': case 'W': case 'C': case 'P': case 'O': iSection = p[1]; goto P_SkipLine;
+        case 'A': goto P_Section_A;
+        default:
+          _rLog( L"Некорректное значение начала секци, пропускаем строку\n" );
+          _rLogS ( L"Некорректное значение начала секци, пропускаем строку\n", TRUE );
+          goto P_SkipLine;
+      }
+    }
+    else if ( *p == '#' ) { goto P_SkipLine; }
+    // Разбираем строку секции
+
+    ////  MNEM
+    aMNEM.n = n;
+    aMNEM.p = p;
+    if ( !isalnum ( *p ) && *p && *p < 0x80 )
+    {
+      _rLog ( L"Некорректное начало названия мнемоники, пропуск строки\n" );
+      _rLogS ( L"Некорректное начало названия мнемоники, пропуск строки\n", TRUE );
+      goto P_SkipLine;
+    }
+    while ( isalnum ( *p ) || *p == '_' || *p > 0x80 || *p == '(' || *p == ')' )
+    {
+      if ( *p == ')' )
+      {
+        _rLog ( L"Закрывающая скобка без открывающей в названии мнемоники, пропуск строки\n" );
+        _rLogS ( L"Закрывающая скобка без открывающей в названии мнемоники, пропуск строки\n", TRUE );
+        goto P_SkipLine;
+      }
+      else
+      // Если нашли открывающую скобку
+      if ( *p == '(' )
+      {
+        // Ищем закрывающую скобку
+        while ( n && *p != ')' ) { ++p; --n; }
+        if ( *p == ')' ) { ++p; --n; }
+        else
+        {
+          _rLog ( L"Отсутсвует закрывающая скобка в названии мнемоники, пропуск строки\n" );
+          _rLogS ( L"Отсутсвует закрывающая скобка в названии мнемоники, пропуск строки\n", TRUE );
+          goto P_SkipLine;
+        }
+        // Считается что после скобок пустая строка до точки
+        break;
+      }
+      ++p; --n;
+    }
+    aMNEM.n -= n;
+    while ( n && ( *p == ' ' || *p == '\t' ) ) { ++p; --n; }
+    if ( *p != '.' )
+    {
+      _rLog ( L"Отсутсвует разделитель [.] после мнемоники, пропуск строки\n" );
+      _rLogS ( L"Отсутсвует разделитель [.] после мнемоники, пропуск строки\n", TRUE );
+      goto P_SkipLine;
+    }
+    ++p; --n;
+    ////  UNITS
+    aUNIT.n = n;
+    aUNIT.p = p;
+    while ( n && !( *p == ' ' || *p == '\t' ) ) { ++p; --n; }
+    aUNIT.n -= n;
+    while ( n && ( *p == ' ' || *p == '\t' ) ) { ++p; --n; }
+    ////  DATA
+    aDATA.n = n;
+    aDATA.p = p;
+    // доходим до разделителя
+    while ( n && !( *p == ':' || *p == '\r' || *p == '\n' ) ) { ++p; --n; }
+    if ( *p != ':' )
+    {
+      _rLog ( L"Отсутсвует разделитель [:] после данных, продолжаем парсинг считая, что строка закончилась\n" );
+      _rLogS ( L"Отсутсвует разделитель [:] после данных, продолжаем парсинг считая, что строка закончилась\n", FALSE );
+      aDESC.p = p;
+      aDESC.n = 0;
+      aDATA.n -= n;
+    }
+    else
+    {
+      aDATA.n -= n;
+      ++p; --n;
+      while ( n && ( *p == ' ' || *p == '\t' ) ) { ++p; --n; }
+      ////  DESCRIPTION
+      aDESC.p = p;
+      aDESC.n = n;
+      while ( n && !( *p == '\r' || *p == '\n' ) ) {  ++p; --n; }
+      aDESC.n -= n;
+    }
+    while ( aDATA.n && ( aDATA.p[aDATA.n-1] == ' ' || aDATA.p[aDATA.n-1] == '\t' ) ) { --aDATA.n; }
+    while ( aDESC.n && ( aDESC.p[aDESC.n-1] == ' ' || aDESC.p[aDESC.n-1] == '\t' ) ) { --aDESC.n; }
+    aLine.n -= n;
+
+    _rLogS ( L"", TRUE );
+    rLogSection ( L"%-16.*hs.%-16.*hs %-64.*hs%.*hs\n", aMNEM.n, aMNEM.p, aUNIT.n, aUNIT.p, aDATA.n, aDATA.p, aDESC.n, aDESC.p );
+
+    goto P_SkipLine;
+
+  P_Section_A:
+  P_End:
+
+
+  rV7_Free ( aMethods );
   return 0;
 }
 static UINT rParseIncl ( const LPCWSTR w7, BYTE * p, UINT n )
@@ -1682,6 +1890,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
   P_End:
     rLog ( NULL );
     rLogTree ( NULL );
+    rLogSection ( NULL );
     return k;
 
 

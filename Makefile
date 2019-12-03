@@ -20,8 +20,20 @@ LDFLAGS :=\
 	-Wall\
 	-municode\
 	-g\
+	-luser32\
 	-larchive\
-
+	-lbz2\
+	-llz4\
+	-llzma\
+	-lz\
+	-lzstd\
+	-lnettle\
+	-lcharset\
+	-liconv\
+	-lbcrypt\
+	-lexpat\
+	-lxml2\
+	-static\
 
 all : main.exe
 	main
