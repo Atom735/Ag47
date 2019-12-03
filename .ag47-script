@@ -15,3 +15,5 @@
   RECREATE;
 
   RUN_TREE   ;
+
+  RUN_PARSE;

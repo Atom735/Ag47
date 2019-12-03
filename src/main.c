@@ -17,6 +17,7 @@
 #include "crc32.c"
 
 #define kPathMaxLen 512
+UINT kFilesParsedPrint = 0xff;
 
 static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
 {
@@ -328,9 +329,18 @@ static struct
 
   UINT                  nFilesLas;
   UINT                  nFilesIncl;
+  UINT                  iState;
+  UINT                  nFilesParsed;
 
 } gScript = {};
 
+enum
+{
+  kSSR_Null,
+  kSSR_Prepared,
+  kSSR_Tree,
+  kSSR_Parse,
+};
 
 
 
@@ -482,6 +492,7 @@ static VOID rSriptPrepareToRun ( )
     wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".rar" ); rV7_Add_W7 ( gScript.vw7PostfixAr, wsz );
   }
   if ( !gScript.w7PathOut ) { rW7_set ( gScript.w7PathOut = rW7_Alloc ( 5 ), L".ag47" ); }
+  gScript.iState = kSSR_Prepared;
 }
 
 static BOOL rW7_PathWithEndOf_W7 ( LPCWSTR w7Path, LPCWSTR w7End )
@@ -511,6 +522,12 @@ static BOOL rW7_PathWithEndOf_VW7 ( const LPCWSTR w7Path, LPWSTR * const vw7End 
     if ( rW7_PathWithEndOf_W7 ( w7Path, vw7End[i] ) ) { return TRUE; }
   }
   return FALSE;
+}
+static UINT rW7_PathLastNameGetSize ( const LPCWSTR w7 )
+{
+  UINT i = 0;
+  while ( (i < w7[0]) && (w7[w7[0]-i] != '/') && (w7[w7[0]-i] != '\\') ) { ++i; }
+  return i;
 }
 
 static UINT rScriptRun_Tree_AR ( const LPWSTR w7, struct archive * const ar )
@@ -666,6 +683,9 @@ static UINT rScriptRun_Tree_FFD ( const LPWSTR w7, WIN32_FIND_DATA * const _ffd 
 static UINT rScriptRun_Tree ( )
 {
   rLog ( L"~ script RUN_TREE\n" );
+  if ( gScript.iState < kSSR_Tree-1 )
+  { rSriptPrepareToRun(); rScriptLog_All(); }
+  printf ( "Подсчёт количества файлов\n" );
 
   // Пытаемся создать папку
   if ( !CreateDirectory ( gScript.w7PathOut+1, NULL ) )
@@ -727,8 +747,226 @@ static UINT rScriptRun_Tree ( )
     }
   }
   rLog ( L"#tree LAS: %u INCL: %u\n", gScript.nFilesLas, gScript.nFilesIncl );
+  printf ( "Количество файлов LAS: %u INCL: %u\n", gScript.nFilesLas, gScript.nFilesIncl );
+  kFilesParsedPrint = (( gScript.nFilesLas + gScript.nFilesIncl ) / 10 ) + 1;
+  gScript.iState = kSSR_Tree;
   return 0;
 }
+
+
+static UINT rParseLas ( const LPCWSTR w7, BYTE * p, UINT n )
+{
+  return 0;
+}
+static UINT rParseIncl ( const LPCWSTR w7, BYTE * p, UINT n )
+{
+  return 0;
+}
+
+static UINT rScriptRun_Parse_AR ( const LPWSTR w7, struct archive * const ar )
+{
+  struct archive_entry *are;
+  while ( archive_read_next_header ( ar, &are ) == ARCHIVE_OK )
+  {
+    const UINT n = (UINT)archive_entry_size(are);
+    const UINT l = w7[0];
+    rW7_addf ( w7, L"/%s", archive_entry_pathname_w(are) );
+
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixAr ) )
+    {
+      BYTE buf[n+1];
+      archive_read_data ( ar, buf, n+1 );
+      struct archive * const ar2 = archive_read_new();
+      archive_read_support_filter_all ( ar2 );
+      archive_read_support_format_all ( ar2 );
+      UINT er = 0;
+      if ( archive_read_open_memory ( ar2, buf, n ) != ARCHIVE_OK )
+      {
+        rLog_Error ( L"archive_read_open_memory (\"%s\")\n", w7+1 );
+        er = __LINE__;
+        goto P_Err;
+      }
+      else
+      {
+        er = rScriptRun_Parse_AR ( w7, ar2 );
+        if ( er ) { goto P_Err; }
+      }
+      P_Err:
+      if ( archive_read_free ( ar2 ) != ARCHIVE_OK )
+      {
+        rLog_Error ( L"archive_read_free (\"%s\")\n", w7+1 );
+      }
+      if ( er ) { w7[0] = l; w7[w7[0]+1] = 0; return er; }
+    }
+    else
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixLas ) )
+    {
+      BYTE buf[n+1];
+      archive_read_data ( ar, buf, n+1 );
+      rParseLas ( w7, buf, n );
+      --gScript.nFilesLas;
+      ++gScript.nFilesParsed;
+      if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
+      {
+        printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+        printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+      }
+    }
+    else
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixIncl ) )
+    {
+      BYTE buf[n+1];
+      archive_read_data ( ar, buf, n+1 );
+      rParseIncl ( w7, buf, n );
+      --gScript.nFilesIncl;
+      ++gScript.nFilesParsed;
+      if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
+      {
+        printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+        printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+      }
+    }
+    else
+    {
+      archive_read_data_skip ( ar );
+    }
+
+    w7[0] = l; w7[w7[0]+1] = 0;
+  }
+  return 0;
+}
+
+static UINT rScriptRun_Parse_FFD ( const LPWSTR w7, WIN32_FIND_DATA * const _ffd )
+{
+  const UINT l = w7[0];
+  rW7_addf ( w7, L"/%s", _ffd->cFileName );
+  if ( _ffd->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
+  {
+    if ( _ffd->cFileName[0] == '.' )
+    {
+      if ( _ffd->cFileName[1] == '\0' )  { w7[0] = l; w7[w7[0]+1] = 0; return 0; } else
+      if ( _ffd->cFileName[1] == '.' )
+      { if ( _ffd->cFileName[2] == '\0' ) { w7[0] = l; w7[w7[0]+1] = 0; return 0; } }
+    }
+    // Продолжаем поиск внутри папки
+    WIN32_FIND_DATA ffd;
+    const UINT _l = w7[0];
+    rW7_addf ( w7, L"/*" );
+    const HANDLE hFind = FindFirstFile ( w7+1, &ffd );
+    w7[0] = _l; w7[w7[0]+1] = 0;
+    if ( hFind == INVALID_HANDLE_VALUE )
+    {
+      rLog_Error_WinAPI ( L"FindFirstFile", GetLastError(), L"(\"%s\")\n", w7+1 );
+      w7[0] = l; w7[w7[0]+1] = 0;
+      return __LINE__;
+    }
+
+    do
+    {
+      const UINT k = rScriptRun_Parse_FFD ( w7, &ffd );
+      if ( k ) { w7[0] = l; w7[w7[0]+1] = 0; FindClose ( hFind ); return k; }
+    } while ( FindNextFile ( hFind, &ffd ) );
+    FindClose ( hFind );
+  }
+  else
+  {
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixAr ) )
+    {
+      struct archive * const ar = archive_read_new();
+      archive_read_support_filter_all ( ar );
+      archive_read_support_format_all ( ar );
+      UINT er = 0;
+      FILE * const pf = _wfopen ( w7+1, L"rb" );
+      assert ( pf );
+      if ( archive_read_open_FILE ( ar, pf ) != ARCHIVE_OK )
+      {
+        rLog_Error ( L"archive_read_open_FILE (\"%s\")\n", w7+1 );
+        er = __LINE__;
+        goto P_Err;
+      }
+      else
+      {
+        er = rScriptRun_Parse_AR ( w7, ar );
+        if ( er ) { goto P_Err; }
+      }
+      P_Err:
+      if ( archive_read_free ( ar ) != ARCHIVE_OK )
+      {
+        rLog_Error ( L"archive_read_free (\"%s\")\n", w7+1 );
+      }
+      fclose ( pf );
+      if ( er ) { w7[0] = l; w7[w7[0]+1] = 0; return er; }
+    }
+    else
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixLas ) )
+    {
+      const UINT n = _ffd->nFileSizeLow;
+      BYTE buf[n+1];
+      rLoadFile ( buf, w7+1, n );
+      rParseLas ( w7, buf, n );
+      --gScript.nFilesLas;
+      ++gScript.nFilesParsed;
+      if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
+      {
+        printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+        printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+      }
+    }
+    else
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixIncl ) )
+    {
+      const UINT n = _ffd->nFileSizeLow;
+      BYTE buf[n+1];
+      rLoadFile ( buf, w7+1, n );
+      rParseIncl ( w7, buf, n );
+      --gScript.nFilesIncl;
+      ++gScript.nFilesParsed;
+      if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
+      {
+        printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+        printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+      }
+    }
+  }
+
+  w7[0] = l; w7[w7[0]+1] = 0;
+  return 0;
+}
+
+static UINT rScriptRun_Parse ( )
+{
+  rLog ( L"~ script RUN_PARSE\n" );
+  if ( gScript.iState < kSSR_Parse-1 ) { const UINT n = rScriptRun_Tree(); if ( n ) { return n; } }
+  printf ( "Обработка и анализ файлов\n" );
+  gScript.nFilesParsed = 0;
+  const UINT n = rV7_GetSize ( gScript.vw7PathIn );
+  for ( UINT i = 0; i < n; ++i )
+  {
+    WCHAR w7[kPathMaxLen];
+    WIN32_FIND_DATA ffd;
+    rW7_setf ( w7, L"%s/*", gScript.vw7PathIn[i]+1 );
+    const HANDLE hFind = FindFirstFile ( w7+1, &ffd );
+    w7[0] = gScript.vw7PathIn[i][0];
+    w7[w7[0]+1] = 0;
+    if ( hFind == INVALID_HANDLE_VALUE )
+    {
+      rLog_Error_WinAPI ( L"FindFirstFile", GetLastError(), L"(\"%s\")\n", w7+1 );
+      return __LINE__;
+    }
+    do
+    {
+      const UINT k = rScriptRun_Parse_FFD ( w7, &ffd );
+      if ( k ) { FindClose ( hFind ); return k; }
+    } while ( FindNextFile ( hFind, &ffd ) );
+    FindClose ( hFind );
+  }
+  printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+  printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+  gScript.iState = kSSR_Parse;
+  return 0;
+}
+
+
 
 static VOID rScriptRelease ( )
 {
@@ -764,6 +1002,7 @@ static VOID rScriptInit ( )
 {
   rScriptRelease ( );
   gScript.bReCreate = FALSE;
+  gScript.iState = kSSR_Null;
 }
 
 
@@ -830,6 +1069,7 @@ static UINT rScriptParse ( LPWSTR p )
 
   UINT _rValArrayOfStrings ( LPWSTR ** val )
   {
+    gScript.iState = kSSR_Null;
     _rSkipWs ( );
     if ( *p != '=' ) { return __LINE__; }
     ++p;
@@ -879,6 +1119,7 @@ static UINT rScriptParse ( LPWSTR p )
 
   UINT _rValString ( LPWSTR * pw7 )
   {
+    gScript.iState = kSSR_Null;
     _rSkipWs ( );
     if ( *p != '=' ) { return __LINE__; }
     ++p;
@@ -921,11 +1162,11 @@ static UINT rScriptParse ( LPWSTR p )
 
     if ( ( nTemp = _rCmp ( "PATH_OUT" ) ) ) { p += nTemp; if ( ( nTemp = _rValString ( &(gScript.w7PathOut) ) ) ) { return nTemp; } return 0; }
 
-    if ( ( nTemp = _rCmp ( "RECREATE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = TRUE; return 0; }
-    if ( ( nTemp = _rCmp ( "NORECREATE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = FALSE; return 0; }
+    if ( ( nTemp = _rCmp ( "RECREATE" ) ) ) { p += nTemp; gScript.iState = kSSR_Null; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = TRUE; return 0; }
+    if ( ( nTemp = _rCmp ( "NORECREATE" ) ) ) { p += nTemp; gScript.iState = kSSR_Null; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = FALSE; return 0; }
 
-    if ( ( nTemp = _rCmp ( "RUN_TREE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; }
-      rSriptPrepareToRun(); rScriptLog_All(); if ( ( nTemp = rScriptRun_Tree ( ) ) ) { return nTemp; } return 0; }
+    if ( ( nTemp = _rCmp ( "RUN_TREE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } if ( ( nTemp = rScriptRun_Tree ( ) ) ) { return nTemp; } return 0; }
+    if ( ( nTemp = _rCmp ( "RUN_PARSE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } if ( ( nTemp = rScriptRun_Parse ( ) ) ) { return nTemp; } return 0; }
 
     return __LINE__;
   }
@@ -960,6 +1201,7 @@ static UINT rScriptParse ( LPWSTR p )
 static UINT rScriptOpen ( const LPCWSTR wszFilePath )
 {
   rLog ( L"Скрипт (\"%s\")\n", wszFilePath );
+  printf ( "Скрипт (\"%ls\")\n", wszFilePath );
   WIN32_FIND_DATA ffd;
   {
     const HANDLE hFind  = FindFirstFile ( wszFilePath, &ffd );
