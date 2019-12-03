@@ -290,6 +290,62 @@ static struct
   BOOL                  bReCreate;
 } gScript = {};
 
+/*
+  Удаляет всё что находится в папаке и подпапках
+*/
+static UINT rEraseFolderTree ( const LPWSTR w7p )
+{
+  WIN32_FIND_DATA ffd;
+  HANDLE hFind;
+  WCHAR w7[kPathMaxLen];
+  rW7_setf ( w7, L"%s/*", w7p+1 );
+  hFind = FindFirstFile ( w7+1, &ffd );
+  if ( hFind == INVALID_HANDLE_VALUE ) { return 0; }
+  do
+  {
+    rW7_setf ( w7, L"%s/%s", w7p+1, ffd.cFileName );
+    if ( ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
+    {
+      if ( ffd.cFileName[0] == '.' )
+      {
+        if ( ffd.cFileName[1] == '\0' )  { continue; }
+        else
+        if ( ffd.cFileName[1] == '.' ) { if ( ffd.cFileName[2] == '\0' ) { continue; } }
+      }
+      const UINT n = rEraseFolderTree ( w7 ); if ( n ) { FindClose ( hFind ); return n; }
+      if(!RemoveDirectory ( w7 ))
+      {
+        rLog_Error ( L"RemoveDirectory (0x%X) (\"%s\") неизвестная ошибка\n", (UINT)GetLastError(), w7+1 );
+        FindClose ( hFind ); return __LINE__;
+      }
+    }
+    else
+    {
+      if ( !DeleteFile ( w7+1 ) )
+      {
+        const UINT er = (UINT)GetLastError();
+        if ( er == ERROR_FILE_NOT_FOUND )
+        {
+          rLog_Error ( L"DeleteFile (0x%X) (\"%s\") файл ненайден\n", er, w7+1 );
+          FindClose ( hFind ); return __LINE__;
+        }
+        else
+        if ( er == ERROR_ACCESS_DENIED )
+        {
+          rLog_Error ( L"DeleteFile (0x%X) (\"%s\") нет доступа к файлу\n", er, w7+1 );
+          FindClose ( hFind ); return __LINE__;
+        }
+        else
+        {
+          rLog_Error ( L"DeleteFile (0x%X) (\"%s\") неизвестная ошибка\n", er, w7+1 );
+          FindClose ( hFind ); return __LINE__;
+        }
+      }
+    }
+  } while ( FindNextFile ( hFind, &ffd ) );
+  FindClose ( hFind ); return 0;
+}
+
 static UINT rSriptPrepareToRun ( )
 {
   if ( !gScript.vw7PathIn ) { gScript.vw7PathIn = rV7_Alloc_W7 ( 0 ); }
@@ -322,16 +378,16 @@ static UINT rSriptPrepareToRun ( )
   if ( !gScript.w7PathOut ) { rW7_set ( gScript.w7PathOut = rW7_Alloc ( 5 ), L".ag47" ); }
 
   // Пытаемся создать папку
-  if ( CreateDirectory ( gScript.w7PathOut, NULL ) == FALSE )
+  if ( !CreateDirectory ( gScript.w7PathOut, NULL ) )
   {
     // Если не получилось создать папку
-    UINT er = (UINT)GetLastError();
+    const UINT er = (UINT)GetLastError();
     if ( er == ERROR_ALREADY_EXISTS )
     {
       // Папка существует, то если флаг RECREATE поднят, то удаляем всё что внутри
       if ( gScript.bReCreate )
       {
-
+        UINT n = rEraseFolderTree ( gScript.w7PathOut ); if ( n ) { return n; }
       }
     }
     else
@@ -342,7 +398,7 @@ static UINT rSriptPrepareToRun ( )
     else
     {
       // Другая ошибка
-      rLog_Error ( L"CreateDirectory (0x%X) (\"%s\")", er, gScript.w7PathOut+1 );
+      rLog_Error ( L"CreateDirectory (0x%X) (\"%s\") неизвестная ошибка\n", er, gScript.w7PathOut+1 );
       return __LINE__;
     }
   }
