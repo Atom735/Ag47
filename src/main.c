@@ -253,15 +253,29 @@ static LPVOID rV7_Add ( const LPVOID v7, const LPVOID p )
 }
 
 
-
-static UINT rLog ( const LPCWSTR fmt, ... )
+static UINT rLog_v ( const LPCWSTR fmt, va_list args )
 {
   static FILE * pFLog = NULL;
   if ( (!fmt) && (pFLog) ) { fclose ( pFLog ); pFLog = NULL; return 0; }
   if ( !pFLog ) { pFLog = rOpenFileToWriteWith_UTF16_BOM ( L".ag47.log" ); }
+  return vfwprintf ( pFLog, fmt, args );
+}
+
+static UINT rLog ( const LPCWSTR fmt, ... )
+{
   va_list args;
   va_start ( args, fmt );
-  UINT i = vfwprintf ( pFLog, fmt, args );
+  UINT i = rLog_v ( fmt, args );
+  va_end ( args );
+  return i;
+}
+
+static UINT rLog_Error ( const LPCWSTR fmt, ...  )
+{
+  rLog ( L"!ERROR: " );
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = rLog_v ( fmt, args );
   va_end ( args );
   return i;
 }
@@ -275,6 +289,99 @@ static struct
   LPWSTR                w7PathOut;
   BOOL                  bReCreate;
 } gScript = {};
+
+static UINT rSriptPrepareToRun ( )
+{
+  if ( !gScript.vw7PathIn ) { gScript.vw7PathIn = rV7_Alloc_W7 ( 0 ); }
+  if ( rV7_GetSize ( gScript.vw7PathIn ) == 0 )
+  {
+    const LPWSTR wsz = rW7_Alloc ( 1 );
+    rW7_set ( wsz, L"." );
+    rV7_Add ( gScript.vw7PathIn, wsz );
+  }
+  if ( !gScript.vw7PostfixLas ) { gScript.vw7PostfixLas = rV7_Alloc_W7 ( 0 ); }
+  if ( rV7_GetSize ( gScript.vw7PostfixLas ) == 0 )
+  {
+    LPWSTR wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".las" ); rV7_Add ( gScript.vw7PostfixLas, wsz );
+  }
+  if ( !gScript.vw7PostfixIncl ) { gScript.vw7PostfixIncl = rV7_Alloc_W7 ( 0 ); }
+  if ( rV7_GetSize ( gScript.vw7PostfixIncl ) == 0 )
+  {
+    LPWSTR wsz = NULL;
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".doc" ); rV7_Add ( gScript.vw7PostfixIncl, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".txt" ); rV7_Add ( gScript.vw7PostfixIncl, wsz );
+    wsz = rW7_Alloc ( 5 ); rW7_set ( wsz, L".docx" );rV7_Add ( gScript.vw7PostfixIncl, wsz );
+  }
+  if ( !gScript.vw7PostfixAr ) { gScript.vw7PostfixAr = rV7_Alloc_W7 ( 0 ); }
+  if ( rV7_GetSize ( gScript.vw7PostfixAr ) == 0 )
+  {
+    LPWSTR wsz = NULL;
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".zip" ); rV7_Add ( gScript.vw7PostfixAr, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".rar" ); rV7_Add ( gScript.vw7PostfixAr, wsz );
+  }
+  if ( !gScript.w7PathOut ) { rW7_set ( gScript.w7PathOut = rW7_Alloc ( 5 ), L".ag47" ); }
+
+  // Пытаемся создать папку
+  if ( CreateDirectory ( gScript.w7PathOut, NULL ) == FALSE )
+  {
+    // Если не получилось создать папку
+    UINT er = (UINT)GetLastError();
+    if ( er == ERROR_ALREADY_EXISTS )
+    {
+      // Папка существует, то если флаг RECREATE поднят, то удаляем всё что внутри
+      if ( gScript.bReCreate )
+      {
+
+      }
+    }
+    else
+    if ( er == ERROR_PATH_NOT_FOUND )
+    {
+      // Не существует пути к подпапке
+    }
+    else
+    {
+      // Другая ошибка
+      rLog_Error ( L"CreateDirectory (0x%X) (\"%s\")", er, gScript.w7PathOut+1 );
+      return __LINE__;
+    }
+  }
+  return 0;
+}
+
+
+static FILE * pFTree            = NULL;
+
+#if 0
+static UINT rLogTree ( const LPCWSTR fmt, ... )
+{
+  if ( (!fmt) && (pFTree) )
+  {
+    fclose ( pFTree );
+    pFTree = NULL;
+  }
+  if ( !pFTree )
+  {
+    WCHAR w7[kPathMaxLen];
+    rW7_addf ( w7, L"/" )
+    pFTree = _wfopen (  );
+  }
+}
+#endif
+static FILE * pFSection         = NULL;
+static FILE * pFMethods         = NULL;
+static FILE * pFTable           = NULL;
+static FILE * pFCopy            = NULL;
+static FILE * pFErros           = NULL;
+
+
+static UINT rScriptRun_Tree ( )
+{
+  UINT n;
+  if ( ( n = rSriptPrepareToRun ( ) ) ) { return n; }
+  rLog ( L"~ script RUN_TREE\n" );
+  return 0;
+}
 
 static VOID rScriptRelease ( )
 {
@@ -453,11 +560,12 @@ static UINT rScriptParse ( LPWSTR p )
     if ( ( nTemp = _rCmp ( "RECREATE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = TRUE; return 0; }
     if ( ( nTemp = _rCmp ( "NORECREATE" ) ) ) { p += nTemp; if ( ( nTemp = _rValNull ( ) ) ) { return nTemp; } gScript.bReCreate = FALSE; return 0; }
 
+    if ( ( nTemp = _rCmp ( "RUN_TREE" ) ) ) { p += nTemp; if ( ( nTemp = rScriptRun_Tree ( ) ) ) { return nTemp; } return 0; }
+
     return __LINE__;
   }
 
   {
-    UINT nTemp;
     while ( TRUE )
     {
       _rSkipWs();
@@ -469,7 +577,7 @@ static UINT rScriptParse ( LPWSTR p )
           nError = __LINE__; goto P_Error;
         case 'A' ... 'Z':
         case 'a' ... 'z':
-          if ( ( nTemp = _rValName() ) ) { nError = nTemp; goto P_Error; }
+          if ( ( nError = _rValName() ) ) { goto P_Error; }
           continue;
         case 0:
           goto P_Ok;
@@ -479,7 +587,7 @@ static UINT rScriptParse ( LPWSTR p )
     }
   }
   P_Error:
-    rLog ( L"!ERROR: [%u] Ошибка синтаксиса (Line in script %u)\n", nError, nLine );
+    rLog_Error ( L"[%u] Ошибка (Line in script %u)\n", nError, nLine );
     return nError;
 
     void _rLogVW7 ( const LPCWSTR wsz, LPWSTR * v7 )
@@ -526,7 +634,7 @@ static UINT rScriptOpen ( const LPCWSTR wszFilePath )
     hFind = FindFirstFile ( wszFilePath, &ffd );
     if ( hFind == INVALID_HANDLE_VALUE )
     {
-      rLog ( L"!ERROR: FindFirstFile (0x%X) (\"%s\")\n", (UINT)GetLastError(), wszFilePath );
+      rLog_Error ( L"FindFirstFile (0x%X) (\"%s\")\n", (UINT)GetLastError(), wszFilePath );
       return __LINE__;
     }
     FindClose ( hFind );
@@ -543,32 +651,35 @@ static UINT rScriptOpen ( const LPCWSTR wszFilePath )
     wBuf[n2] = L'\0';
     return rScriptParse ( wBuf );
   }
-  rLog ( L"!ERROR: неизвестная кодировка файла скрипта (\"%s\")\n", wszFilePath );
+  rLog_Error ( L"неизвестная кодировка файла скрипта (\"%s\")\n", wszFilePath );
   return __LINE__;
 }
 
-static FILE * pFTree            = NULL;
-#if 0
-static UINT rLogTree ( const LPCWSTR fmt, ... )
-{
-  if ( (!fmt) && (pFTree) )
-  {
-    fclose ( pFTree );
-    pFTree = NULL;
-  }
-  if ( !pFTree )
-  {
-    WCHAR w7[kPathMaxLen];
-    rW7_addf ( w7, L"/" )
-    pFTree = _wfopen (  );
-  }
-}
-#endif
-static FILE * pFSection         = NULL;
-static FILE * pFMethods         = NULL;
-static FILE * pFTable           = NULL;
-static FILE * pFCopy            = NULL;
-static FILE * pFErros           = NULL;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

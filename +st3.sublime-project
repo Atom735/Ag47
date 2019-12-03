@@ -18,7 +18,7 @@
     "margin": 0,
     "fold_buttons": true,
     "fade_fold_buttons": false,
-    "mini_diff": false,
+    "mini_diff": "auto",
     "rulers": [24, 32, 40, 60, 80, 100],
     "spell_check": false,
     "tab_size": 2,

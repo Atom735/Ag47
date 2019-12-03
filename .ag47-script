@@ -12,3 +12,5 @@
   FORMAT_AR=[".zip",".rar"];
 
   RECREATE;
+
+  RUN_TREE   ;
