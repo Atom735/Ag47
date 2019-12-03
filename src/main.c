@@ -305,7 +305,7 @@ static LPVOID rV7_Add ( const LPVOID v7, const LPVOID p )
   if ( u[0] <= u[1] )
   {
     const LPVOID _v7 = rV7_Copy ( v7, u[0]*2 );
-    free ( v7 );
+    rV7_Free ( v7 );
     return rV7_Add ( _v7, p );
   }
   memcpy ( (LPVOID)( ((UINT_PTR)v7) + (u[1]*u[2]) ), p, u[2] );
@@ -387,6 +387,26 @@ static UINT rLogSection ( const LPCWSTR fmt, ... )
   {
     WCHAR w7[kPathMaxLen];
     rW7_setf ( w7, L"%s/.ag47/_2.sections.log", gScript.w7PathOut+1 );
+    pF = rOpenFileToWriteWith_UTF16_BOM ( w7+1 );
+  }
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = vfwprintf ( pF, fmt, args );
+  va_end ( args );
+  return i;
+}
+static UINT rLogMethods ( const LPCWSTR fmt, ... )
+{
+  static FILE * pF = NULL;
+  if ( !fmt )
+  {
+    if ( pF ) { fclose ( pF ); pF = NULL; return 0; }
+    return 0;
+  }
+  if ( !pF )
+  {
+    WCHAR w7[kPathMaxLen];
+    rW7_setf ( w7, L"%s/.ag47/_2.methods.log", gScript.w7PathOut+1 );
     pF = rOpenFileToWriteWith_UTF16_BOM ( w7+1 );
   }
   va_list args;
@@ -498,27 +518,27 @@ static VOID rSriptPrepareToRun ( )
   {
     const LPWSTR wsz = rW7_Alloc ( 1 );
     rW7_set ( wsz, L"." );
-    rV7_Add_W7 ( gScript.vw7PathIn, wsz );
+    gScript.vw7PathIn = rV7_Add_W7 ( gScript.vw7PathIn, wsz );
   }
   if ( !gScript.vw7PostfixLas ) { gScript.vw7PostfixLas = rV7_Alloc_W7 ( 0 ); }
   if ( rV7_GetSize ( gScript.vw7PostfixLas ) == 0 )
   {
-    LPWSTR wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".las" ); rV7_Add_W7 ( gScript.vw7PostfixLas, wsz );
+    LPWSTR wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".las" ); gScript.vw7PostfixLas = rV7_Add_W7 ( gScript.vw7PostfixLas, wsz );
   }
   if ( !gScript.vw7PostfixIncl ) { gScript.vw7PostfixIncl = rV7_Alloc_W7 ( 0 ); }
   if ( rV7_GetSize ( gScript.vw7PostfixIncl ) == 0 )
   {
     LPWSTR wsz = NULL;
-    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".doc" ); rV7_Add_W7 ( gScript.vw7PostfixIncl, wsz );
-    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".txt" ); rV7_Add_W7 ( gScript.vw7PostfixIncl, wsz );
-    wsz = rW7_Alloc ( 5 ); rW7_set ( wsz, L".docx" );rV7_Add_W7 ( gScript.vw7PostfixIncl, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".doc" ); gScript.vw7PostfixIncl = rV7_Add_W7 ( gScript.vw7PostfixIncl, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".txt" ); gScript.vw7PostfixIncl = rV7_Add_W7 ( gScript.vw7PostfixIncl, wsz );
+    wsz = rW7_Alloc ( 5 ); rW7_set ( wsz, L".docx" );gScript.vw7PostfixIncl = rV7_Add_W7 ( gScript.vw7PostfixIncl, wsz );
   }
   if ( !gScript.vw7PostfixAr ) { gScript.vw7PostfixAr = rV7_Alloc_W7 ( 0 ); }
   if ( rV7_GetSize ( gScript.vw7PostfixAr ) == 0 )
   {
     LPWSTR wsz = NULL;
-    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".zip" ); rV7_Add_W7 ( gScript.vw7PostfixAr, wsz );
-    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".rar" ); rV7_Add_W7 ( gScript.vw7PostfixAr, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".zip" ); gScript.vw7PostfixAr = rV7_Add_W7 ( gScript.vw7PostfixAr, wsz );
+    wsz = rW7_Alloc ( 4 ); rW7_set ( wsz, L".rar" ); gScript.vw7PostfixAr = rV7_Add_W7 ( gScript.vw7PostfixAr, wsz );
   }
   if ( !gScript.w7PathOut ) { rW7_set ( gScript.w7PathOut = rW7_Alloc ( 5 ), L".ag47" ); }
   gScript.iState = kSSR_Prepared;
@@ -728,6 +748,7 @@ static UINT rScriptRun_Tree ( )
       {
         rLogTree ( NULL );
         rLogSection ( NULL );
+        rLogMethods ( NULL );
         const UINT n = rEraseFolderTree ( gScript.w7PathOut ); if ( n ) { return n; }
       }
     }
@@ -817,7 +838,8 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     UINT                n;
     double              fA;
     double              fB;
-  } * aMethods = rV7_Alloc ( sizeof(*aMethods), 0 );
+  } * aMethods, aMethodT;
+  aMethods = rV7_Alloc ( sizeof(*aMethods), 0 );
 
   BOOL _bLog = TRUE;
   BOOL _bLogSecton = TRUE;
@@ -974,7 +996,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     aLine.n -= n;
 
     _rLogS ( L"", TRUE );
-    rLogSection ( L"%-16.*hs.%-16.*hs %-64.*hs:%-64.*hs %s\n", aMNEM.n, aMNEM.p, aUNIT.n, aUNIT.p, aDATA.n, aDATA.p, aDESC.n, aDESC.p, w7+1 );
+    rLogSection ( L"%-16.*hs~%hc.%-16.*hs %-64.*hs:%-64.*hs %s\n", aMNEM.n, aMNEM.p, iSection, aUNIT.n, aUNIT.p, aDATA.n, aDATA.p, aDESC.n, aDESC.p, w7+1 );
 
     #define D7_PARSER_VAL_SSSN(sz,val) \
       if ( _rCmp ( aMNEM.p, sz ) )\
@@ -1003,42 +1025,54 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
         }\
       }
 
-    D7_PARSER_VAL_SSSN("STRT",aSTRT)
-    else
-    D7_PARSER_VAL_SSSN("STOP",aSTRT)
-    else
-    D7_PARSER_VAL_SSSN("STEP",aSTRT)
-    else
-    D7_PARSER_VAL_SSSN("NULL",aSTRT)
-    else
-    if ( _rCmp ( aMNEM.p, "WELL" ) )
+    if ( iSection == 'W' )
     {
-      if ( _rCmp ( aDATA.p, "WELL" ) || aDATA.n == 0 )
+      D7_PARSER_VAL_SSSN("STRT",aSTRT)
+      else
+      D7_PARSER_VAL_SSSN("STOP",aSTRT)
+      else
+      D7_PARSER_VAL_SSSN("STEP",aSTRT)
+      else
+      D7_PARSER_VAL_SSSN("NULL",aSTRT)
+      else
+      if ( _rCmp ( aMNEM.p, "WELL" ) )
       {
-        aWELL.p = aDESC.p;
-        aWELL.n = aDESC.n;
+        if ( _rCmp ( aDATA.p, "WELL" ) || aDATA.n == 0 )
+        {
+          aWELL.p = aDESC.p;
+          aWELL.n = aDESC.n;
+        }
+        else
+        {
+          aWELL.p = aDATA.p;
+          aWELL.n = aDATA.n;
+        }
       }
       else
+      if ( _rCmp ( aMNEM.p, "METD" ) )
       {
-        aWELL.p = aDATA.p;
-        aWELL.n = aDATA.n;
+        if ( _rCmp ( aDATA.p, "METHOD" ) || aDATA.n == 0 )
+        {
+          aMETD.p = aDESC.p;
+          aMETD.n = aDESC.n;
+        }
+        else
+        {
+          aMETD.p = aDATA.p;
+          aMETD.n = aDATA.n;
+        }
       }
     }
     else
-    if ( _rCmp ( aMNEM.p, "METD" ) )
+    if ( iSection == 'C' )
     {
-      if ( _rCmp ( aDATA.p, "METHOD" ) || aDATA.n == 0 )
-      {
-        aMETD.p = aDESC.p;
-        aMETD.n = aDESC.n;
-      }
-      else
-      {
-        aMETD.p = aDATA.p;
-        aMETD.n = aDATA.n;
-      }
+      aMethodT.p = aMNEM.p;
+      aMethodT.n = aMNEM.n;
+      aMethodT.fA = __min ( aSTRT.v, aSTOP.v );
+      aMethodT.fB = __max ( aSTRT.v, aSTOP.v );
+      aMethods = rV7_Add ( aMethods, &aMethodT );
+      rLogMethods ( L"%-16.*hs~%hc.%-16.*hs %-64.*hs:%-64.*hs %s\n", aMNEM.n, aMNEM.p, iSection, aUNIT.n, aUNIT.p, aDATA.n, aDATA.p, aDESC.n, aDESC.p, w7+1 );
     }
-
 
 
     goto P_SkipLine;
@@ -1971,6 +2005,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
     rLog ( NULL );
     rLogTree ( NULL );
     rLogSection ( NULL );
+    rLogMethods ( NULL );
     return k;
 
 
