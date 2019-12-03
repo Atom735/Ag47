@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <locale.h>
 #include <math.h>
 #include <stdarg.h>
@@ -22,6 +23,51 @@ static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
   FILE * const fd = _wfopen ( wszFname, L"wb" );
   if ( fd ) fwprintf ( fd, L"%c", 0xFEFF );
   return fd;
+}
+
+
+static UINT rLog_v ( const LPCWSTR fmt, va_list args )
+{
+  static FILE * pFLog = NULL;
+  if ( !fmt )
+  {
+    if ( pFLog ) { fclose ( pFLog ); pFLog = NULL; return 0; }
+    return 0;
+  }
+  if ( !pFLog ) { pFLog = rOpenFileToWriteWith_UTF16_BOM ( L".ag47.log" ); }
+  return vfwprintf ( pFLog, fmt, args );
+}
+
+static UINT rLog ( const LPCWSTR fmt, ... )
+{
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = rLog_v ( fmt, args );
+  va_end ( args );
+  return i;
+}
+
+static UINT rLog_Error ( const LPCWSTR fmt, ... )
+{
+  rLog ( L"!ERROR: " );
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = rLog_v ( fmt, args );
+  va_end ( args );
+  return i;
+}
+static UINT rLog_Error_WinAPI ( const LPCWSTR wszFuncName, const DWORD nErrorCode, const LPCWSTR fmt, ... )
+{
+  rLog_Error ( L"%s (0x%x) ", wszFuncName, nErrorCode );
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = rLog_v ( fmt, args );
+  va_end ( args );
+  WCHAR buf[kPathMaxLen*2];
+  FormatMessage ( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+          nErrorCode, MAKELANGID(LANG_RUSSIAN, SUBLANG_DEFAULT), buf, kPathMaxLen*2, NULL );
+  rLog_Error ( L" ==> %s", buf );
+  return i;
 }
 
 /*
@@ -68,6 +114,7 @@ UINT rGetCodePage ( BYTE const * p, UINT n )
 static PBYTE rLoadFile ( const PBYTE p, const LPCWSTR wsz, const UINT n )
 {
   FILE * const fd = _wfopen ( wsz, L"rb" );
+  if ( !fd ) { rLog_Error ( L"Неудалось открыть файл %s\n", wsz ); }
   assert ( fd );
   UINT N = 0;
   while ( N < n )
@@ -287,50 +334,6 @@ static struct
 
 
 
-static UINT rLog_v ( const LPCWSTR fmt, va_list args )
-{
-  static FILE * pFLog = NULL;
-  if ( !fmt )
-  {
-    if ( pFLog ) { fclose ( pFLog ); pFLog = NULL; return 0; }
-    return 0;
-  }
-  if ( !pFLog ) { pFLog = rOpenFileToWriteWith_UTF16_BOM ( L".ag47.log" ); }
-  return vfwprintf ( pFLog, fmt, args );
-}
-
-static UINT rLog ( const LPCWSTR fmt, ... )
-{
-  va_list args;
-  va_start ( args, fmt );
-  UINT i = rLog_v ( fmt, args );
-  va_end ( args );
-  return i;
-}
-
-static UINT rLog_Error ( const LPCWSTR fmt, ... )
-{
-  rLog ( L"!ERROR: " );
-  va_list args;
-  va_start ( args, fmt );
-  UINT i = rLog_v ( fmt, args );
-  va_end ( args );
-  return i;
-}
-static UINT rLog_Error_WinAPI ( const LPCWSTR wszFuncName, const DWORD nErrorCode, const LPCWSTR fmt, ... )
-{
-  rLog_Error ( L"%s (0x%x) ", wszFuncName, nErrorCode );
-  va_list args;
-  va_start ( args, fmt );
-  UINT i = rLog_v ( fmt, args );
-  va_end ( args );
-  WCHAR buf[kPathMaxLen*2];
-  FormatMessage ( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-          nErrorCode, MAKELANGID(LANG_RUSSIAN, SUBLANG_DEFAULT), buf, kPathMaxLen*2, NULL );
-  rLog_Error ( L" ==> %s", buf );
-  return i;
-}
-
 
 
 static UINT rLogTree ( const LPCWSTR fmt, ... )
@@ -500,7 +503,7 @@ static BOOL rW7_PathWithEndOf_W7 ( LPCWSTR w7Path, LPCWSTR w7End )
   }
   return TRUE;
 }
-static BOOL rW7_PathWithEndOf_VW7 ( const LPCWSTR w7Path, LPCWSTR const * const vw7End )
+static BOOL rW7_PathWithEndOf_VW7 ( const LPCWSTR w7Path, LPWSTR * const vw7End )
 {
   const UINT k = rV7_GetSize ( vw7End );
   for ( UINT i = 0; i < k; ++i )
@@ -510,6 +513,68 @@ static BOOL rW7_PathWithEndOf_VW7 ( const LPCWSTR w7Path, LPCWSTR const * const 
   return FALSE;
 }
 
+static UINT rScriptRun_Tree_AR ( const LPWSTR w7, struct archive * const ar )
+{
+  struct archive_entry *are;
+  while ( archive_read_next_header ( ar, &are ) == ARCHIVE_OK )
+  {
+    const UINT n = (UINT)archive_entry_size(are);
+    const UINT l = w7[0];
+    rW7_addf ( w7, L"/%s", archive_entry_pathname_w(are) );
+
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixAr ) )
+    {
+      BYTE buf[n+1];
+      archive_read_data ( ar, buf, n+1 );
+      struct archive * const ar2 = archive_read_new();
+      archive_read_support_filter_all ( ar2 );
+      archive_read_support_format_all ( ar2 );
+      UINT er = 0;
+      if ( archive_read_open_memory ( ar2, buf, n ) != ARCHIVE_OK )
+      {
+        rLog_Error ( L"archive_read_open_memory (\"%s\")\n", w7+1 );
+        er = __LINE__;
+        goto P_Err;
+      }
+      else
+      {
+        er = rScriptRun_Tree_AR ( w7, ar2 );
+        if ( er ) { goto P_Err; }
+      }
+      P_Err:
+      if ( archive_read_free ( ar2 ) != ARCHIVE_OK )
+      {
+        rLog_Error ( L"archive_read_free (\"%s\")\n", w7+1 );
+      }
+      if ( er ) { w7[0] = l; w7[w7[0]+1] = 0; return er; }
+    }
+    else
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixLas ) )
+    {
+      BYTE buf[n+1];
+      archive_read_data ( ar, buf, n+1 );
+      rLogTree ( L"L%08" TEXT(PRIx32) L"%016" TEXT(PRIx64) L"% 10d %s\n",
+            rCRC32 ( buf, n ), rAg47cs ( buf, n ), n, w7+1 );
+      ++gScript.nFilesLas;
+    }
+    else
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixIncl ) )
+    {
+      BYTE buf[n+1];
+      archive_read_data ( ar, buf, n+1 );
+      rLogTree ( L"I%08" TEXT(PRIx32) L"%016" TEXT(PRIx64) L"% 10d %s\n",
+            rCRC32 ( buf, n ), rAg47cs ( buf, n ), n, w7+1 );
+      ++gScript.nFilesIncl;
+    }
+    else
+    {
+      archive_read_data_skip ( ar );
+    }
+
+    w7[0] = l; w7[w7[0]+1] = 0;
+  }
+  return 0;
+}
 
 static UINT rScriptRun_Tree_FFD ( const LPWSTR w7, WIN32_FIND_DATA * const _ffd )
 {
@@ -545,7 +610,53 @@ static UINT rScriptRun_Tree_FFD ( const LPWSTR w7, WIN32_FIND_DATA * const _ffd 
   }
   else
   {
-
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixAr ) )
+    {
+      struct archive * const ar = archive_read_new();
+      archive_read_support_filter_all ( ar );
+      archive_read_support_format_all ( ar );
+      UINT er = 0;
+      FILE * const pf = _wfopen ( w7+1, L"rb" );
+      assert ( pf );
+      if ( archive_read_open_FILE ( ar, pf ) != ARCHIVE_OK )
+      {
+        rLog_Error ( L"archive_read_open_FILE (\"%s\")\n", w7+1 );
+        er = __LINE__;
+        goto P_Err;
+      }
+      else
+      {
+        er = rScriptRun_Tree_AR ( w7, ar );
+        if ( er ) { goto P_Err; }
+      }
+      P_Err:
+      if ( archive_read_free ( ar ) != ARCHIVE_OK )
+      {
+        rLog_Error ( L"archive_read_free (\"%s\")\n", w7+1 );
+      }
+      fclose ( pf );
+      if ( er ) { w7[0] = l; w7[w7[0]+1] = 0; return er; }
+    }
+    else
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixLas ) )
+    {
+      const UINT n = _ffd->nFileSizeLow;
+      BYTE buf[n+1];
+      rLoadFile ( buf, w7+1, n );
+      rLogTree ( L"L%08" TEXT(PRIx32) L"%016" TEXT(PRIx64) L"% 10d %s\n",
+            rCRC32 ( buf, n ), rAg47cs ( buf, n ), n, w7+1 );
+      ++gScript.nFilesLas;
+    }
+    else
+    if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixIncl ) )
+    {
+      const UINT n = _ffd->nFileSizeLow;
+      BYTE buf[n+1];
+      rLoadFile ( buf, w7+1, n );
+      rLogTree ( L"I%08" TEXT(PRIx32) L"%016" TEXT(PRIx64) L"% 10d %s\n",
+            rCRC32 ( buf, n ), rAg47cs ( buf, n ), n, w7+1 );
+      ++gScript.nFilesIncl;
+    }
   }
 
   w7[0] = l; w7[w7[0]+1] = 0;
@@ -615,6 +726,7 @@ static UINT rScriptRun_Tree ( )
       FindClose ( hFind );
     }
   }
+  rLog ( L"#tree LAS: %u INCL: %u\n", gScript.nFilesLas, gScript.nFilesIncl );
   return 0;
 }
 

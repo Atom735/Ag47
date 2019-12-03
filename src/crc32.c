@@ -54,12 +54,12 @@ static UINT32 rCRC32 ( BYTE const * const buf, const UINT len )
 static UINT64 rAg47cs ( BYTE const * buf, UINT len )
 {
   UINT64 n = 0;
-  UINT k=0;
+  UINT k = 0;
   while ( len )
   {
-    n = ((*buf) + n) ^ ((*buf) << (32 + k*4));
+    n ^= (((UINT64)(*buf))<<(k*4));
     ++k;
-    if ( k >= 8 ) k = 0;
+    if ( k >= 64/4 ) k = 0;
     ++buf;
     --len;
   }
