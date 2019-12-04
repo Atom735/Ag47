@@ -98,23 +98,23 @@ static const WCHAR g_ctCyrillicTable_28595[128] = {
 #define kNCyrillicTables 5
 
 static const LPCSTR g_aszCyrillicTableLocaleNames[] = {
-  ".855",
   ".866",
+  ".855",
   ".1251",
   ".10007",
   ".28595",
 };
 static const UINT g_aszCyrillicTableId[] = {
-  855,
   866,
+  855,
   1251,
   10007,
   28595,
 };
 
 static const LPCWSTR g_ctCyrillicTables[] = {
-  g_ctCyrillicTable_855,
   g_ctCyrillicTable_866,
+  g_ctCyrillicTable_855,
   g_ctCyrillicTable_1251,
   g_ctCyrillicTable_10007,
   g_ctCyrillicTable_28595,
