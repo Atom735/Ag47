@@ -14,13 +14,14 @@ CFLAGS :=\
 	-Wall\
 	-municode\
 	-g\
+	-IF:/ARGilyazeev/msys64/mingw64/include/libxml2\
 #   -mwindows\
 
 LDFLAGS :=\
 	-Wall\
 	-municode\
 	-g\
-	-luser32\
+	-lxml2\
 	-larchive\
 	-lbz2\
 	-llz4\
@@ -32,7 +33,8 @@ LDFLAGS :=\
 	-liconv\
 	-lbcrypt\
 	-lexpat\
-	-lxml2\
+	-luser32\
+	-lws2_32\
 	-static\
 
 all : main.exe

@@ -14,6 +14,9 @@
 #include <archive.h>
 #include <archive_entry.h>
 
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+
 #include "cyrillic.c"
 #include "crc32.c"
 
@@ -2294,7 +2297,118 @@ static UINT rSearchWordConv ( )
 
 INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 {
+  LIBXML_TEST_VERSION
+
   UINT k = 0;
+  {
+    struct archive * const ar = archive_read_new();
+    archive_read_support_filter_all ( ar );
+    archive_read_support_format_all ( ar );
+    WCHAR w7[kPathMaxLen];
+    rW7_setf ( w7, L"%s/%s", L"F:/ARGilyazeev/github/Ag47/.ag47/.ag47/temp_inkl", L"2250 Икнлинометрия.doc.docx" );
+    FILE * const pf = _wfopen ( w7+1, L"rb" );
+    assert ( pf );
+    if ( archive_read_open_FILE ( ar, pf ) != ARCHIVE_OK )
+    {
+      rLog_Error ( L"archive_read_open_FILE (\"%s\")\n", w7+1 );
+      k = __LINE__;
+      goto P_Err;
+    }
+    else
+    {
+      struct archive_entry *are;
+      while ( archive_read_next_header ( ar, &are ) == ARCHIVE_OK )
+      {
+        const UINT nSize = (UINT)archive_entry_size(are);
+        LPCWSTR pName = archive_entry_pathname_w(are);
+        LPCWSTR pName2 = L"word/document.xml";
+        BOOL b = TRUE;
+        while ( b )
+        {
+          if ( iswalpha ( *pName2 ) && iswalpha ( *pName ) )
+          {
+            b &= ((*pName2)&0x1f) == ((*pName)&0x1f);
+          }
+          else
+          if ( ((*pName2) == '/') || ((*pName2) == '\\') )
+          {
+            b &= ((*pName) == '/' || (*pName) == '\\');
+          }
+          else
+          {
+            b &= (*pName) == (*pName2);
+            if ( (*pName2) == 0 )
+            {
+              BYTE abData[nSize+1];
+              // Парсим Las файл из архива
+              archive_read_data ( ar, abData, nSize+1 );
+              xmlDocPtr doc = xmlReadMemory ( abData, nSize, "document.xml", NULL, 0 );
+              if ( doc == NULL )
+              {
+                fprintf(stderr, "Failed to parse document\n");
+              }
+              else
+              {
+                FILE * const fp = rOpenFileToWriteWith_UTF16_BOM ( L".ag47/doc.log" );
+                fwprintf ( fp, L"encode = %hs\n", doc->encoding );
+                xmlNodePtr root_element = xmlDocGetRootElement ( doc );
+                UINT d = 0;
+
+                VOID print_e ( xmlNodePtr a_node )
+                {
+                  for (  xmlNodePtr cur_node = a_node; cur_node; cur_node = cur_node->next)
+                  {
+                    fwprintf ( fp, L"%.*s<%hs>",
+                            d, L"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
+                            cur_node->name );
+                    for ( xmlAttrPtr at_node = cur_node->properties; at_node; at_node = at_node->next)
+                    {
+                      xmlNodePtr val = at_node->children;
+                      if ( val )
+                      {
+
+                      }
+                      else
+                      {
+                        fwprintf ( fp, L"    %hs", at_node->name ) ;
+                      }
+                    }
+
+                    fwprintf ( fp, L"\n" ) ;
+                    if ( XML_GET_CONTENT ( cur_node ) )
+                    {
+                      WCHAR w[kPathMaxLen];
+                      rUTF8_ToWide ( XML_GET_CONTENT ( cur_node ), xmlStrlen( XML_GET_CONTENT ( cur_node ) ), w );
+                      fwprintf ( fp, L"%.*s^^ %s\n",
+                              d, L"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t", w );
+                    }
+                    ++d;
+                    print_e(cur_node->children );
+                    --d;
+                  }
+                }
+                print_e ( root_element );
+              }
+              xmlFreeDoc ( doc );
+              goto P_Err;
+            }
+          }
+          ++pName; ++pName2;
+        }
+        archive_read_data_skip ( ar );
+      }
+    }
+    P_Err:
+    if ( archive_read_free ( ar ) != ARCHIVE_OK )
+    {
+      rLog_Error ( L"archive_read_free (\"%s\")\n", w7+1 );
+    }
+    fclose ( pf );
+    goto P_End;
+  }
+
+
+  return 0;
   if ( ( k = rSearchWordConv ( ) ) ) goto P_End;
   WCHAR cmd[kPathMaxLen];
   LPCWSTR lp = L"F:/ARGilyazeev/github/Ag47/.ag47/.ag47/temp_inkl";
@@ -2313,6 +2427,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
     rLogSection ( NULL );
     rLogMethods ( NULL );
     rLogTable ( NULL );
+    xmlCleanupParser();
     return k;
 
 
