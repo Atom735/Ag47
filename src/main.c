@@ -346,6 +346,7 @@ static struct
   UINT                  nFilesIncl;
   UINT                  iState;
   UINT                  nFilesParsed;
+  UINT                  nFilesError;
 
 } gScript = {};
 
@@ -851,6 +852,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
   setlocale ( LC_ALL, g_aszCyrillicTableLocaleNames[iCP] );
   UINT iState = 0; // 0 - Normal, 1 - Warning, 2 - Error
   UINT iErr = 0;
+  LPCWSTR sErr = NULL;
 
   struct
   {
@@ -867,7 +869,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     UINT                n;
     union {
       double            v;
-      UINT              i;
+      UINT              u;
     };
   } aSTRT = { }, aSTOP = { }, aSTEP = { }, aNULL = { }, aWELL = { }, aMETD = { };
 
@@ -942,8 +944,9 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
         case 'V': case 'W': case 'C': case 'P': case 'O': iSection = p[1]; goto P_SkipLine;
         case 'A': goto P_Section_A;
         default:
-          _rLog( L"Некорректное значение начала секци, прекращаем разбор файла\n" );
-          _rLogS ( L"Некорректное значение начала секци, прекращаем разбор файла\n", TRUE );
+          sErr = L"Некорректное значение начала секци, прекращаем разбор файла\n";
+          _rLog( sErr );
+          _rLogS ( sErr, TRUE );
           iState = 2; iErr = __LINE__;
           goto P_End;
       }
@@ -951,8 +954,9 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     else if ( *p == '#' ) { goto P_SkipLine; }
     if ( iSection == 0 )
     {
-      _rLog ( L"Некорректное начало LAS файла, прекращаем разбор файла\n" );
-      _rLogS ( L"Некорректное начало LAS файла, прекращаем разбор файла\n", TRUE );
+      sErr = L"Некорректное начало LAS файла, прекращаем разбор файла\n";
+      _rLog ( sErr );
+      _rLogS ( sErr, TRUE );
       iState = 2; iErr = __LINE__;
       goto P_End;
     }
@@ -962,18 +966,20 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     aMNEM.p = p;
     if ( !isalnum ( *p ) && *p && *p < 0x80 )
     {
-      _rLog ( L"Некорректное начало названия мнемоники, пропуск строки\n" );
-      _rLogS ( L"Некорректное начало названия мнемоники, пропуск строки\n", TRUE );
-      iState = 1;
+      sErr = L"Некорректное начало названия мнемоники, пропуск строки\n";
+      _rLog ( sErr );
+      _rLogS ( sErr, TRUE );
+      iState = 2; iErr = __LINE__;
       goto P_SkipLine;
     }
     while ( isalnum ( *p ) || *p == '_' || *p > 0x80 || *p == '(' || *p == ')' )
     {
       if ( *p == ')' )
       {
-        _rLog ( L"Закрывающая скобка без открывающей в названии мнемоники, пропуск строки\n" );
-        _rLogS ( L"Закрывающая скобка без открывающей в названии мнемоники, пропуск строки\n", TRUE );
-        iState = 1;
+        sErr = L"Закрывающая скобка без открывающей в названии мнемоники, пропуск строки\n";
+        _rLog ( sErr );
+        _rLogS ( sErr, TRUE );
+        iState = 1; iErr = __LINE__;
         goto P_SkipLine;
       }
       else
@@ -985,9 +991,10 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
         if ( *p == ')' ) { ++p; --n; }
         else
         {
-          _rLog ( L"Отсутсвует закрывающая скобка в названии мнемоники, пропуск строки\n" );
-          _rLogS ( L"Отсутсвует закрывающая скобка в названии мнемоники, пропуск строки\n", TRUE );
-          iState = 1;
+          sErr = L"Отсутсвует закрывающая скобка в названии мнемоники, пропуск строки\n";
+          _rLog ( sErr );
+          _rLogS ( sErr, TRUE );
+          iState = 1; iErr = __LINE__;
           goto P_SkipLine;
         }
         // Считается что после скобок пустая строка до точки
@@ -999,17 +1006,21 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     while ( n && ( *p == ' ' || *p == '\t' ) ) { ++p; --n; }
     if ( *p != '.' )
     {
-      _rLog ( L"Отсутсвует разделитель [.] после мнемоники, пропуск строки\n" );
-      _rLogS ( L"Отсутсвует разделитель [.] после мнемоники, пропуск строки\n", TRUE );
-      iState = 1;
-      goto P_SkipLine;
+      sErr = L"Отсутсвует разделитель [.] после мнемоники, продолжаем парсинг считая, что далее идут данные\n";
+      _rLog ( sErr );
+      _rLogS ( sErr, TRUE );
+      aUNIT.p = p;
+      aUNIT.n = 0;
     }
-    ++p; --n;
-    ////  UNITS
-    aUNIT.n = n;
-    aUNIT.p = p;
-    while ( n && !( *p == ' ' || *p == '\t' ) ) { ++p; --n; }
-    aUNIT.n -= n;
+    else
+    {
+      ++p; --n;
+      ////  UNITS
+      aUNIT.n = n;
+      aUNIT.p = p;
+      while ( n && !( *p == ' ' || *p == '\t' ) ) { ++p; --n; }
+      aUNIT.n -= n;
+    }
     while ( n && ( *p == ' ' || *p == '\t' ) ) { ++p; --n; }
     ////  DATA
     aDATA.n = n;
@@ -1018,8 +1029,9 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     while ( n && !( *p == ':' || *p == '\r' || *p == '\n' ) ) { ++p; --n; }
     if ( *p != ':' )
     {
-      _rLog ( L"Отсутсвует разделитель [:] после данных, продолжаем парсинг считая, что строка закончилась\n" );
-      _rLogS ( L"Отсутсвует разделитель [:] после данных, продолжаем парсинг считая, что строка закончилась\n", FALSE );
+      sErr = L"Отсутсвует разделитель [:] после данных, продолжаем парсинг считая, что строка закончилась\n";
+      _rLog ( sErr );
+      _rLogS ( sErr, FALSE );
       aDESC.p = p;
       aDESC.n = 0;
       aDATA.n -= n;
@@ -1064,11 +1076,13 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
           {\
             val.p = NULL;\
             val.n = 0;\
-            _rLog ( L"Неудалось получить значение " TEXT(sz) L"\n" );\
+            sErr = L"Неудалось получить значение " TEXT(sz) L", прекращаем разбор файла\n";\
+            _rLog ( sErr );\
+            iState = 2; iErr = __LINE__;\
+            goto P_End;\
           }\
         }\
       }
-
     if ( iSection == 'W' )
     {
       D7_PARSER_VAL_SSSN("STRT",aSTRT)
@@ -1168,7 +1182,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
         const double f = strtod ( (LPCSTR)p, &pp );
         if ( (LONG_PTR)p == (LONG_PTR)pp ) { goto P_EndOfA; }
         // если он не близок к значению NULL, т.е. значение существует
-        #define kAsciiDataErr 0.01
+        #define kAsciiDataErr 0.1
         if ( fabs ( f-aNULL.v ) > kAsciiDataErr )
         {
           // если верхняя граница ниже настоящего значения, то записываем и с другой границе также
@@ -1187,46 +1201,121 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     P_EndOfA:
     if ( fabs ( aMethods[0].fA - __min ( aSTRT.v, aSTOP.v ) ) > kAsciiDataErr )
     {
-      _rLog ( L"Неточное значение DEPTH в начале секции ASCII\n" );
+      sErr = L"Неточное значение DEPTH в начале секции ASCII\n";
+      _rLog ( sErr );
+      iState = 1; iErr = __LINE__;
     }
     if ( fabs ( aMethods[0].fB - __max ( aSTRT.v, aSTOP.v ) ) > kAsciiDataErr )
     {
-      _rLog ( L"Неточное значение DEPTH в конце секции ASCII\n" );
+      sErr = L"Неточное значение DEPTH в конце секции ASCII\n";
+      _rLog ( sErr );
+      iState = 1; iErr = __LINE__;
     }
   }
   P_End:
   {
-    if ( iState == 2 )
+    if ( iState )
     {
       static UINT k = 0;
       _rLog ( L"Ошибка в разборе файла, копирование файла в .../.ag47/error_las/\n" );
       WCHAR _w7[kPathMaxLen];
       // rW7_setf ( _w7, L"%s/.ag47/error_las/%s", gScript.w7PathOut+1, w7+(w7[0]-rW7_PathLastNameGetSize(w7)) );
-      rW7_setf ( _w7, L"%s/.ag47/error_las/%u.las", gScript.w7PathOut+1, k );
+      rW7_setf ( _w7, L"%s/.ag47/error_las/%05u.las", gScript.w7PathOut+1, k );
       ++k;
       FILE * const pf = _wfopen ( _w7+1, L"wb" );
       fprintf ( pf, "# Ag47_CodePage. %s\r\n", g_aszCyrillicTableLocaleNames[iCP] );
       fprintf ( pf, "# Ag47_Origin.   %ls\r\n", w7+1 );
       fprintf ( pf, "# Ag47_Error.    %u\r\n", iErr );
+      fprintf ( pf, "# %ls\r\n", sErr );
       fwrite ( pBufBegin, 1, nBufSize, pf );
       fclose ( pf );
+      ++(gScript.nFilesError);
+
+      rV7_Free ( aMethods );
       return iErr;
     }
-    const UINT kN = rV7_GetSize ( aMethods );
-    rLogTable ( L"%8.*hs\t%f\t%f\t%f\t%f\t%-8.*hs|\t",
-            aWELL.n, aWELL.p,
-            aSTRT.v, aSTOP.v, aSTEP.v, aNULL.v,
-            aMETD.n, aMETD.p );
-
-    for ( UINT i = 0; i < kN; ++i )
+    else
     {
-      rLogTable ( L"%-8.*hs\t%f\t%f|\t",
-            aMethods[i].n, aMethods[i].p, aMethods[i].fA, aMethods[i].fB );
+      aWELL.u = 0;
+      // Попытка получить номер скважины из поля скважины
+      for ( UINT i = 0; i < aWELL.n; ++i )
+      {
+        if ( aWELL.u = (UINT) atoi ( ((LPCSTR)(aWELL.p))+i ) ) { break; }
+      }
+      // Попытка получить номер скважины из других полей скважины
+      #define D7_PARSER_GET_WELL(val) \
+        if ( aWELL.u == 0 )\
+        {\
+          for ( UINT i = 0; i < val.n; ++i )\
+          {\
+            if ( aWELL.u = (UINT) atoi ( ((LPCSTR)(val.p))+i ) ) { break; }\
+          }\
+        }
+      D7_PARSER_GET_WELL(aWELL_W1);
+      D7_PARSER_GET_WELL(aWELL_W2);
+      D7_PARSER_GET_WELL(aWELL_O1);
+      D7_PARSER_GET_WELL(aWELL_O2);
+      D7_PARSER_GET_WELL(aWN_W1);
+      D7_PARSER_GET_WELL(aWN_W2);
+      // Неудалось получить номер скважины
+      if ( aWELL.u == 0 )
+      {
+        sErr = L"Не удалось получить значение номера скважины\n";
+        _rLog ( sErr );
+        iState = 2; iErr = __LINE__;
+        goto P_End;
+      }
+
+      {
+        const UINT kN = rV7_GetSize ( aMethods );
+        rLogTable ( L"% 6u\t%f\t%f\t%f\t%f\t%-8.*hs|\t",
+                aWELL.u,
+                aSTRT.v, aSTOP.v, aSTEP.v, aNULL.v,
+                aMETD.n, aMETD.p );
+
+        for ( UINT i = 0; i < kN; ++i )
+        {
+          rLogTable ( L"%-8.*hs\t%f\t%f|\t",
+                aMethods[i].n, aMethods[i].p, aMethods[i].fA, aMethods[i].fB );
+        }
+        rLogTable ( L"%s\n", w7+1 );
+      }
+
+
+      WCHAR _w7_[kPathMaxLen];
+      for ( UINT i = 0; i <= 999; ++i )
+      {
+        rW7_setf ( _w7_, L"%s/%u_%s_[%03u].LAS", gScript.w7PathOut+1, aWELL.u, w7+(w7[0]-rW7_PathLastNameGetSize(w7))+1, i );
+        FILE * const pf = _wfopen ( _w7_+1, L"rb" );
+        if ( pf ) { fclose ( pf ); } else { break; }
+      }
+      FILE * const pf = _wfopen ( _w7_+1, L"wb" );
+      if ( pf )
+      {
+        fprintf ( pf, "# Ag47_CodePage. %s\r\n", g_aszCyrillicTableLocaleNames[iCP] );
+        fprintf ( pf, "# Ag47_Origin.   %ls\r\n", w7+1 );
+        fprintf ( pf, "# Ag47_ID.       L%08" PRIx32 "%016" PRIx64 "%08x\r\n",
+              rCRC32 ( pBufBegin, nBufSize ), rAg47cs ( pBufBegin, nBufSize ), nBufSize );
+        const UINT kN = rV7_GetSize ( aMethods );
+        fprintf ( pf, "# Ag47_MtdCount. %u\r\n", kN );
+        for ( UINT i = 0; i < kN; ++i )
+        {
+          fprintf ( pf, "# Ag47_Method. \"%.*s\" %f %f\r\n", aMethods[i].n, aMethods[i].p, aMethods[i].fA, aMethods[i].fB );
+        }
+        fwrite ( pBufBegin, 1, nBufSize, pf );
+        fclose ( pf );
+      }
+      else
+      {
+        _rLog ( L"Невозможно открыть файл для записи\n" );
+        _rLog ( _w7_+1 );
+        iErr == __LINE__;
+      }
+
+      rV7_Free ( aMethods );
+      return iErr;
     }
-    rLogTable ( L"%s\n", w7+1 );
   }
-  rV7_Free ( aMethods );
-  return 0;
 }
 static UINT rParseIncl ( const LPCWSTR w7, BYTE * p, UINT n )
 {
@@ -1405,6 +1494,7 @@ static UINT rScriptRun_Parse_FFD ( const LPWSTR w7, WIN32_FIND_DATA * const _ffd
 
 static UINT rScriptRun_Parse ( )
 {
+  gScript.nFilesError = 0;
   rLog ( L"~ script RUN_PARSE\n" );
   if ( gScript.iState < kSSR_Parse-1 ) { const UINT n = rScriptRun_Tree(); if ( n ) { return n; } }
   printf ( "Обработка и анализ файлов\n" );
@@ -1432,6 +1522,7 @@ static UINT rScriptRun_Parse ( )
   }
   printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
   printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+  printf ( "Файлов с ошибками %u\n", gScript.nFilesError );
   gScript.iState = kSSR_Parse;
   return 0;
 }
