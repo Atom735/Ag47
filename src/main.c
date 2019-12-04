@@ -18,9 +18,17 @@
 #include "crc32.c"
 
 // [\x00-\x09\x0B-\x1f]
+// F:\ARGilyazeev\github\Ag47\t_data\2012г\2253\2253_1.09\z2253_NC_ок.doc
+// F:\ARGilyazeev\github\Ag47\.ag47\.ag47\NC.docx
+// wordconv.exe -oice -nme <input file> <output file>
+// wordconv.exe -oice -nme "F:\ARGilyazeev\github\Ag47\t_data\2012г\2253\2253_1.09\z2253_NC_ок.doc" "F:\ARGilyazeev\github\Ag47\.ag47\.ag47\NC.docx"
 
 #define kPathMaxLen 512
 UINT kFilesParsedPrint = 0xff;
+WCHAR g_w7PathToWordConv[kPathMaxLen] = { };
+
+// #define D7_printf(...) wprintf ( L##__VA_ARGS__ )
+#define D7_printf(...) printf ( __VA_ARGS__ )
 
 static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
 {
@@ -84,40 +92,7 @@ static UINT rLog_Error_WinAPI ( const LPCWSTR wszFuncName, const DWORD nErrorCod
   return i;
 }
 
-/*
-  Функция получения номера кодировки для однбайтовых данных совместимых с кодировкой ASCII
-  @ p                   указатель на начало данных
-  @ n                   количество данных
-  @ return              номер кодировки из базы
-*/
-static UINT rGetCodePage ( BYTE const * p, UINT n )
-{
-  UINT u[kNCyrillicTables] = { };
-  while ( n )
-  {
-    if ( (*p) & 0x80 )
-    {
-      for ( UINT i = 0; i < kNCyrillicTables; ++i )
-      {
-        const WCHAR w = g_ctCyrillicTables[i][ (*p) & 0x7f ];
-        if ( w >= 0x410 && w <= 0x44F )
-        {
-          u[i] += g_nCyrillicPeriodTable[(w<0x430)?(w-0x410):(w-0x430)];
-        }
-      }
-    }
-    ++p; --n;
-  }
-  UINT k=0;
-  for ( UINT i = 1; i < kNCyrillicTables; ++i )
-  {
-    if ( u[i] > u[k] )
-    {
-      k = i;
-    }
-  }
-  return k;
-}
+
 
 /*
   Функция загрузки файла в память
@@ -614,8 +589,10 @@ static UINT rScriptRun_Tree_AR ( const LPWSTR w7, struct archive * const ar )
 
     if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixAr ) )
     {
-      BYTE buf[n+1];
-      archive_read_data ( ar, buf, n+1 );
+      BYTE buf[n+256];
+      la_ssize_t aer = archive_read_data ( ar, buf, n+256 );
+      if ( aer < 0 ) { aer = archive_read_data ( ar, buf, n+256 ); }
+      if ( aer != n ) { rLog_Error ( L"archive_read_data [%d/%u] (\"%s\")\n", aer, n, w7+1 ); }
       struct archive * const ar2 = archive_read_new();
       archive_read_support_filter_all ( ar2 );
       archive_read_support_format_all ( ar2 );
@@ -641,8 +618,10 @@ static UINT rScriptRun_Tree_AR ( const LPWSTR w7, struct archive * const ar )
     else
     if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixLas ) )
     {
-      BYTE buf[n+1];
-      archive_read_data ( ar, buf, n+1 );
+      BYTE buf[n+256];
+      la_ssize_t aer = archive_read_data ( ar, buf, n+256 );
+      if ( aer < 0 ) { aer = archive_read_data ( ar, buf, n+256 ); }
+      if ( aer != n ) { rLog_Error ( L"archive_read_data [%d/%u] (\"%s\")\n", aer, n, w7+1 ); }
       rLogTree ( L"L%08" TEXT(PRIx32) L"%016" TEXT(PRIx64) L"% 10d %s\n",
             rCRC32 ( buf, n ), rAg47cs ( buf, n ), n, w7+1 );
       ++gScript.nFilesLas;
@@ -650,8 +629,10 @@ static UINT rScriptRun_Tree_AR ( const LPWSTR w7, struct archive * const ar )
     else
     if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixIncl ) )
     {
-      BYTE buf[n+1];
-      archive_read_data ( ar, buf, n+1 );
+      BYTE buf[n+256];
+      la_ssize_t aer = archive_read_data ( ar, buf, n+256 );
+      if ( aer < 0 ) { aer = archive_read_data ( ar, buf, n+256 ); }
+      if ( aer != n ) { rLog_Error ( L"archive_read_data [%d/%u] (\"%s\")\n", aer, n, w7+1 ); }
       rLogTree ( L"I%08" TEXT(PRIx32) L"%016" TEXT(PRIx64) L"% 10d %s\n",
             rCRC32 ( buf, n ), rAg47cs ( buf, n ), n, w7+1 );
       ++gScript.nFilesIncl;
@@ -758,7 +739,7 @@ static UINT rScriptRun_Tree ( )
   rLog ( L"~ script RUN_TREE\n" );
   if ( gScript.iState < kSSR_Tree-1 )
   { rSriptPrepareToRun(); rScriptLog_All(); }
-  printf ( "Подсчёт количества файлов\n" );
+  D7_printf ( "Подсчёт количества файлов\n" );
 
   // Пытаемся создать папку
   if ( !CreateDirectory ( gScript.w7PathOut+1, NULL ) )
@@ -809,6 +790,21 @@ static UINT rScriptRun_Tree ( )
       rLog_Error_WinAPI ( L"CreateDirectory", er, L"(\"%s\") неизвестная ошибка\n", w7+1 );
       return __LINE__;
     }
+    rW7_setf ( w7, L"%s/.ag47/temp_las", gScript.w7PathOut+1 );
+    if ( !CreateDirectory ( w7+1, NULL ) )
+    {
+      const DWORD er = GetLastError();
+      rLog_Error_WinAPI ( L"CreateDirectory", er, L"(\"%s\") неизвестная ошибка\n", w7+1 );
+      return __LINE__;
+    }
+    rW7_setf ( w7, L"%s/.ag47/temp_inkl", gScript.w7PathOut+1 );
+    if ( !CreateDirectory ( w7+1, NULL ) )
+    {
+      const DWORD er = GetLastError();
+      rLog_Error_WinAPI ( L"CreateDirectory", er, L"(\"%s\") неизвестная ошибка\n", w7+1 );
+      return __LINE__;
+    }
+
   }
   // Просматриваем все данные подпапки
   {
@@ -835,7 +831,7 @@ static UINT rScriptRun_Tree ( )
     }
   }
   rLog ( L"#tree LAS: %u INCL: %u\n", gScript.nFilesLas, gScript.nFilesIncl );
-  printf ( "Количество файлов LAS: %u INCL: %u\n", gScript.nFilesLas, gScript.nFilesIncl );
+  D7_printf ( "Количество файлов LAS: %u INCL: %u\n", gScript.nFilesLas, gScript.nFilesIncl );
   kFilesParsedPrint = (( gScript.nFilesLas + gScript.nFilesIncl ) / 10 ) + 1;
   gScript.iState = kSSR_Tree;
   return 0;
@@ -1240,7 +1236,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
       // Попытка получить номер скважины из поля скважины
       for ( UINT i = 0; i < aWELL.n; ++i )
       {
-        if ( aWELL.u = (UINT) atoi ( ((LPCSTR)(aWELL.p))+i ) ) { break; }
+        if ( ( aWELL.u = (UINT) atoi ( ((LPCSTR)(aWELL.p))+i ) ) ) { break; }
       }
       // Попытка получить номер скважины из других полей скважины
       #define D7_PARSER_GET_WELL(val) \
@@ -1248,7 +1244,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
         {\
           for ( UINT i = 0; i < val.n; ++i )\
           {\
-            if ( aWELL.u = (UINT) atoi ( ((LPCSTR)(val.p))+i ) ) { break; }\
+            if ( ( aWELL.u = (UINT) atoi ( ((LPCSTR)(val.p))+i ) ) ) { break; }\
           }\
         }
       D7_PARSER_GET_WELL(aWELL_W1);
@@ -1257,6 +1253,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
       D7_PARSER_GET_WELL(aWELL_O2);
       D7_PARSER_GET_WELL(aWN_W1);
       D7_PARSER_GET_WELL(aWN_W2);
+      #undef D7_PARSER_GET_WELL
       // Неудалось получить номер скважины
       if ( aWELL.u == 0 )
       {
@@ -1285,7 +1282,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
       WCHAR _w7_[kPathMaxLen];
       for ( UINT i = 0; i <= 999; ++i )
       {
-        rW7_setf ( _w7_, L"%s/%u_%s_[%03u].LAS", gScript.w7PathOut+1, aWELL.u, w7+(w7[0]-rW7_PathLastNameGetSize(w7))+1, i );
+        rW7_setf ( _w7_, L"%s/.ag47/temp_las/%u_%s_[%03u].LAS", gScript.w7PathOut+1, aWELL.u, w7+(w7[0]-rW7_PathLastNameGetSize(w7))+1, i );
         FILE * const pf = _wfopen ( _w7_+1, L"rb" );
         if ( pf ) { fclose ( pf ); } else { break; }
       }
@@ -1319,6 +1316,34 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
 }
 static UINT rParseIncl ( const LPCWSTR w7, BYTE * p, UINT n )
 {
+  {
+    // Создаём временную копию
+    WCHAR _w7_[kPathMaxLen];
+    rW7_setf ( _w7_, L"%s/.ag47/temp_inkl/%s", gScript.w7PathOut+1, w7+(w7[0]-rW7_PathLastNameGetSize(w7))+1 );
+    {
+      FILE * pf = _wfopen ( _w7_+1, L"rb" );
+      if ( pf )
+      {
+        fclose ( pf );
+        for ( UINT i = 0; i < 999; ++i )
+        {
+          rW7_setf ( _w7_, L"%s/.ag47/temp_inkl/%u%s", gScript.w7PathOut+1, i, w7+(w7[0]-rW7_PathLastNameGetSize(w7))+1 );
+          pf = _wfopen ( _w7_+1, L"rb" );
+          if ( pf ) { fclose ( pf ); } else { break; }
+        }
+      }
+    }
+    {
+      FILE * const pf = _wfopen ( _w7_+1, L"wb" );
+      if ( !pf )
+      {
+        rLog_Error ( L"INKL: Невозможно открыть файл для записи \"%s\"\n", _w7_+1 );
+        return __LINE__;
+      }
+      fwrite ( p, 1, n, pf );
+      fclose ( pf );
+    }
+  }
   return 0;
 }
 
@@ -1333,8 +1358,10 @@ static UINT rScriptRun_Parse_AR ( const LPWSTR w7, struct archive * const ar )
 
     if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixAr ) )
     {
-      BYTE buf[n+1];
-      archive_read_data ( ar, buf, n+1 );
+      BYTE buf[n+256];
+      la_ssize_t aer = archive_read_data ( ar, buf, n+256 );
+      if ( aer < 0 ) { aer = archive_read_data ( ar, buf, n+256 ); }
+      if ( aer != n ) { rLog_Error ( L"archive_read_data [%d/%u] (\"%s\")\n", aer, n, w7+1 ); }
       struct archive * const ar2 = archive_read_new();
       archive_read_support_filter_all ( ar2 );
       archive_read_support_format_all ( ar2 );
@@ -1360,29 +1387,33 @@ static UINT rScriptRun_Parse_AR ( const LPWSTR w7, struct archive * const ar )
     else
     if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixLas ) )
     {
-      BYTE buf[n+1];
-      archive_read_data ( ar, buf, n+1 );
+      BYTE buf[n+256];
+      la_ssize_t aer = archive_read_data ( ar, buf, n+256 );
+      if ( aer < 0 ) { aer = archive_read_data ( ar, buf, n+256 ); }
+      if ( aer != n ) { rLog_Error ( L"archive_read_data [%d/%u] (\"%s\")\n", aer, n, w7+1 ); }
       rParseLas ( w7, buf, n );
       --gScript.nFilesLas;
       ++gScript.nFilesParsed;
       if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
       {
-        printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
-        printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+        D7_printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+        D7_printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
       }
     }
     else
     if ( rW7_PathWithEndOf_VW7 ( w7, gScript.vw7PostfixIncl ) )
     {
-      BYTE buf[n+1];
-      archive_read_data ( ar, buf, n+1 );
+      BYTE buf[n+256];
+      la_ssize_t aer = archive_read_data ( ar, buf, n+256 );
+      if ( aer < 0 ) { aer = archive_read_data ( ar, buf, n+256 ); }
+      if ( aer != n ) { rLog_Error ( L"archive_read_data [%d/%u] (\"%s\")\n", aer, n, w7+1 ); }
       rParseIncl ( w7, buf, n );
       --gScript.nFilesIncl;
       ++gScript.nFilesParsed;
       if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
       {
-        printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
-        printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+        D7_printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+        D7_printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
       }
     }
     else
@@ -1467,8 +1498,8 @@ static UINT rScriptRun_Parse_FFD ( const LPWSTR w7, WIN32_FIND_DATA * const _ffd
       ++gScript.nFilesParsed;
       if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
       {
-        printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
-        printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+        D7_printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+        D7_printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
       }
     }
     else
@@ -1482,8 +1513,8 @@ static UINT rScriptRun_Parse_FFD ( const LPWSTR w7, WIN32_FIND_DATA * const _ffd
       ++gScript.nFilesParsed;
       if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
       {
-        printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
-        printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+        D7_printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+        D7_printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
       }
     }
   }
@@ -1497,7 +1528,7 @@ static UINT rScriptRun_Parse ( )
   gScript.nFilesError = 0;
   rLog ( L"~ script RUN_PARSE\n" );
   if ( gScript.iState < kSSR_Parse-1 ) { const UINT n = rScriptRun_Tree(); if ( n ) { return n; } }
-  printf ( "Обработка и анализ файлов\n" );
+  D7_printf ( "Обработка и анализ файлов\n" );
   gScript.nFilesParsed = 0;
   const UINT n = rV7_GetSize ( gScript.vw7PathIn );
   for ( UINT i = 0; i < n; ++i )
@@ -1520,9 +1551,10 @@ static UINT rScriptRun_Parse ( )
     } while ( FindNextFile ( hFind, &ffd ) );
     FindClose ( hFind );
   }
-  printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
-  printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
-  printf ( "Файлов с ошибками %u\n", gScript.nFilesError );
+  D7_printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
+  D7_printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
+  D7_printf ( "Файлов с ошибками %u\n", gScript.nFilesError );
+
   gScript.iState = kSSR_Parse;
   return 0;
 }
@@ -1758,7 +1790,7 @@ static UINT rScriptParse ( LPWSTR p )
 static UINT rScriptOpen ( const LPCWSTR wszFilePath )
 {
   rLog ( L"Скрипт (\"%s\")\n", wszFilePath );
-  printf ( "Скрипт (\"%ls\")\n", wszFilePath );
+  D7_printf ( "Скрипт (\"%ls\")\n", wszFilePath );
   WIN32_FIND_DATA ffd;
   {
     const HANDLE hFind  = FindFirstFile ( wszFilePath, &ffd );
@@ -2228,13 +2260,52 @@ static UINT rParsePath ( )
 }
 
 
+
+static UINT rScriptRun_DocToDocx ( )
+{
+}
+
+static UINT rSearchWordConv ( )
+{
+  WIN32_FIND_DATA ffd;
+  const HANDLE hFind = FindFirstFile ( L"C:/Program Files (x86)/Microsoft Office/Office*", &ffd );
+  if ( hFind == INVALID_HANDLE_VALUE )
+  {
+    D7_printf ( "Невозможно найти папку с установленным MS Office\n" );
+    FindClose ( hFind );
+    return __LINE__;
+  }
+  do
+  {
+    rW7_setf ( g_w7PathToWordConv, L"C:/Program Files (x86)/Microsoft Office/%s/wordconv.exe", ffd.cFileName );
+    WIN32_FIND_DATA _ffd;
+    const HANDLE _hFind = FindFirstFile ( g_w7PathToWordConv+1, &_ffd );
+    if ( _hFind != INVALID_HANDLE_VALUE )
+    {
+      D7_printf ( "wordconv.exe найден по пути: %ls\n", g_w7PathToWordConv+1 );
+      FindClose ( _hFind );
+      FindClose ( hFind );
+      return 0;
+    }
+  } while ( FindNextFile ( hFind, &ffd ) );
+  FindClose ( hFind );
+  return __LINE__;
+}
+
 INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 {
   UINT k = 0;
+  if ( ( k = rSearchWordConv ( ) ) ) goto P_End;
+  WCHAR cmd[kPathMaxLen];
+  LPCWSTR lp = L"F:/ARGilyazeev/github/Ag47/.ag47/.ag47/temp_inkl";
+  rW7_setf ( cmd, L"for %%W in (%s/*.doc) do (\"%s\" -oice -nme \"%s/%%~nxW\" \"%s/%%~nxW.docx\")", lp, g_w7PathToWordConv+1, lp, lp );
+  _wsystem ( cmd+1 );
+
+  //for %A in (F:/ARGilyazeev/github/Ag47/.ag47/.ag47/temp_inkl/*.doc) do (echo "%~nA" )
+  return 0;
   if ( argc == 1 )
   {
-    k = rScriptOpen ( L".ag47-script" );
-    if ( k ) goto P_End;
+    if ( ( k = rScriptOpen ( L".ag47-script" ) ) ) goto P_End;
   }
   P_End:
     rLog ( NULL );
@@ -2245,7 +2316,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
     return k;
 
 
-  // printf ( "setlocale: %s\n", setlocale ( LC_ALL, "" ) );
+  // D7_printf ( "setlocale: %s\n", setlocale ( LC_ALL, "" ) );
   // pF = rOpenFileToWriteWith_UTF16_BOM ( L"out.log" );
   // pF_S = rOpenFileToWriteWith_UTF16_BOM ( L"sections.log" );
   // pF_M = rOpenFileToWriteWith_UTF16_BOM ( L"methods.log" );
@@ -2269,7 +2340,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
   //   rParseFile();
   // }
 
-  // printf ( "%d\n", atoi ( "   1312093saodakskdo") );
+  // D7_printf ( "%d\n", atoi ( "   1312093saodakskdo") );
 
   // fclose ( pF_O );
   // fclose ( pF_M );

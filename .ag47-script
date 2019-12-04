@@ -13,8 +13,8 @@
 */
   FORMAT_AR=[".zip",".rar"];
 
-  RECREATE;
+  //RECREATE;
 
-  RUN_TREE   ;
+  //RUN_TREE   ;
 
-  RUN_PARSE;
+  //RUN_PARSE;

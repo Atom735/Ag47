@@ -119,3 +119,39 @@ static const LPCWSTR g_ctCyrillicTables[] = {
   g_ctCyrillicTable_10007,
   g_ctCyrillicTable_28595,
 };
+
+/*
+  Функция получения номера кодировки для однбайтовых данных совместимых с кодировкой ASCII
+  @ p                   указатель на начало данных
+  @ n                   количество данных
+  @ return              номер кодировки из базы
+*/
+static UINT rGetCodePage ( BYTE const * p, UINT n )
+{
+  UINT u[kNCyrillicTables] = { };
+  while ( n )
+  {
+    if ( (*p) & 0x80 )
+    {
+      for ( UINT i = 0; i < kNCyrillicTables; ++i )
+      {
+        const WCHAR w = g_ctCyrillicTables[i][ (*p) & 0x7f ];
+        if ( w >= 0x410 && w <= 0x44F )
+        {
+          u[i] += g_nCyrillicPeriodTable[(w<0x430)?(w-0x410):(w-0x430)];
+        }
+      }
+    }
+    ++p; --n;
+  }
+  u[3] = u[3]*10/13;
+  UINT k=0;
+  for ( UINT i = 1; i < kNCyrillicTables; ++i )
+  {
+    if ( u[i] > u[k] )
+    {
+      k = i;
+    }
+  }
+  return k;
+}

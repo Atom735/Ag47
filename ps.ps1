@@ -1,7 +1,7 @@
 [ref]$SaveFormat = “microsoft.office.interop.word.WdSaveFormat” -as [type]
 $word = New-Object -ComObject word.application
 $word.visible = $false
-$folderpath = “F:\ARGilyazeev\github\Ag47\t_data\*”
+$folderpath = “F:\ARGilyazeev\github\Ag47\t_data\2012ã\2253\2253_1.09\z2253_NC_îê.doc”
 $fileType = “*doc”
 Get-ChildItem -path $folderpath -include $fileType |
 foreach-object `
