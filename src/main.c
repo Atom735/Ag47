@@ -457,6 +457,48 @@ static VOID rScriptLog_All ( )
   rScriptLog_Bool ( L"RECREATE", L"NORECREATE", gScript.bReCreate );
 }
 
+static UINT rSearchWordConv ( )
+{
+  WIN32_FIND_DATA ffd;
+  const HANDLE hFind = FindFirstFile ( L"C:/Program Files (x86)/Microsoft Office/Office*", &ffd );
+  if ( hFind == INVALID_HANDLE_VALUE )
+  {
+    rLog_Error ( L"Невозможно найти папку с установленным MS Office\n" );
+    FindClose ( hFind );
+    return __LINE__;
+  }
+  do
+  {
+    rW7_setf ( g_w7PathToWordConv, L"C:/Program Files (x86)/Microsoft Office/%s/wordconv.exe", ffd.cFileName );
+    WIN32_FIND_DATA _ffd;
+    const HANDLE _hFind = FindFirstFile ( g_w7PathToWordConv+1, &_ffd );
+    if ( _hFind != INVALID_HANDLE_VALUE )
+    {
+      rLog ( L"wordconv.exe найден по пути: %ls\n", g_w7PathToWordConv+1 );
+      FindClose ( _hFind );
+      FindClose ( hFind );
+      return 0;
+    }
+  } while ( FindNextFile ( hFind, &ffd ) );
+  FindClose ( hFind );
+  rLog_Error ( L"Невозможно найти wordconv.exe\n" );
+  return __LINE__;
+}
+
+static UINT rScriptRun_DocToDocx ( const LPCWSTR wsz )
+{
+  if ( g_w7PathToWordConv[0] == 0 )
+  {
+    UINT k;
+    if ( ( k = rSearchWordConv ( ) ) ) { return k; }
+  }
+  WCHAR cmd[kPathMaxLen];
+  // LPCWSTR lp = L"F:/ARGilyazeev/github/Ag47/.ag47/.ag47/temp_inkl";
+  rW7_setf ( cmd, L"for %%W in (%s/*.doc) do (\"%s\" -oice -nme \"%s/%%~nxW\" \"%s/%%~nxW.docx\")", wsz, g_w7PathToWordConv+1, wsz, wsz );
+  _wsystem ( cmd+1 );
+  return 0;
+}
+
 /*
   Удаляет всё что находится в папаке и подпапках
 */
@@ -1154,7 +1196,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
   P_Section_A:
   {
     while ( n && !( *p == '\n' || *p == '\r' ) ) { ++p; --n; }
-    const UINT kLines = fabs ( ( aSTRT.v - aSTOP.v ) / aSTEP.v );
+    // const UINT kLines = fabs ( ( aSTRT.v - aSTOP.v ) / aSTEP.v );
     UINT nLinesReaded = 0;
     LPSTR pp;
     const UINT kN = rV7_GetSize ( aMethods );
@@ -1309,7 +1351,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
       {
         _rLog ( L"Невозможно открыть файл для записи\n" );
         _rLog ( _w7_+1 );
-        iErr == __LINE__;
+        iErr = __LINE__;
       }
 
       rV7_Free ( aMethods );
@@ -1317,7 +1359,7 @@ static UINT rParseLas ( const LPCWSTR w7, BYTE const * p, UINT n )
     }
   }
 }
-static UINT rParseIncl ( const LPCWSTR w7, BYTE * p, UINT n )
+static UINT rParseIncl_Prepare ( const LPCWSTR w7, BYTE * p, UINT n )
 {
   {
     // Создаём временную копию
@@ -1349,6 +1391,246 @@ static UINT rParseIncl ( const LPCWSTR w7, BYTE * p, UINT n )
   }
   return 0;
 }
+
+static UINT rParseInkl_Xml ( xml, w7DocPtr doc, const LPCWSTR w7 )
+{
+  enum
+  {
+      kPIXS_kNull = 0,
+      kPIXS_kSearchedTitle, // Поиск загаловка "Инклинометрия"
+      kPIXS_kGetWell, // Поиск номера скважины
+      kPIXS_kGetIncl, // Поиск угла склонения
+      kPIXS_kGetAlt, // Поиск альтитуды
+      kPIXS_kGetEnd, // Поиск забоя
+      kPIXS_kData, // Поиск таблицы данных
+  };
+  FILE * const fp = rOpenFileToWriteWith_UTF16_BOM ( L".ag47/doc.xml" );
+  UINT iErr = 0;
+  fwprintf ( fp, L"Encode = %hs\n", doc->encoding );
+  xmlNodePtr root_element = xmlDocGetRootElement ( doc );
+  UINT d = 0;
+  UINT iState = kPIXS_kNull;
+
+  VOID _rPrintTab ( )
+  {
+    fwprintf ( fp, L"%.*s", d, L"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t" );
+  }
+  LPCWSTR _rNodeType ( const xmlElementType i )
+  {
+    switch ( i )
+    {
+      case XML_ELEMENT_NODE:
+        return L"ELEMENT_NODE";
+      case XML_ATTRIBUTE_NODE:
+        return L"ATTRIBUTE_NODE";
+      case XML_TEXT_NODE:
+        return L"TEXT_NODE";
+      case XML_CDATA_SECTION_NODE:
+        return L"CDATA_SECTION_NODE";
+      case XML_ENTITY_REF_NODE:
+        return L"ENTITY_REF_NODE";
+      case XML_ENTITY_NODE:
+        return L"ENTITY_NODE";
+      case XML_PI_NODE:
+        return L"PI_NODE";
+      case XML_COMMENT_NODE:
+        return L"COMMENT_NODE";
+      case XML_DOCUMENT_NODE:
+        return L"DOCUMENT_NODE";
+      case XML_DOCUMENT_TYPE_NODE:
+        return L"DOCUMENT_TYPE_NODE";
+      case XML_DOCUMENT_FRAG_NODE:
+        return L"DOCUMENT_FRAG_NODE";
+      case XML_NOTATION_NODE:
+        return L"NOTATION_NODE";
+      case XML_HTML_DOCUMENT_NODE:
+        return L"HTML_DOCUMENT_NODE";
+      case XML_DTD_NODE:
+        return L"DTD_NODE";
+      case XML_ELEMENT_DECL:
+        return L"ELEMENT_DECL";
+      case XML_ATTRIBUTE_DECL:
+        return L"ATTRIBUTE_DECL";
+      case XML_ENTITY_DECL:
+        return L"ENTITY_DECL";
+      case XML_NAMESPACE_DECL:
+        return L"NAMESPACE_DECL";
+      case XML_XINCLUDE_START:
+        return L"XINCLUDE_START";
+      case XML_XINCLUDE_END:
+        return L"XINCLUDE_END";
+      case XML_DOCB_DOCUMENT_NODE:
+        return L"DOCB_DOCUMENT_NODE";
+      default:
+        return L"UNKNOWN";
+    }
+  }
+
+  VOID _rPrint_e ( xmlNodePtr a_node )
+  {
+    for ( xmlNodePtr cur_node = a_node; cur_node; cur_node = cur_node->next )
+    {
+      if ( cur_node->type == XML_ELEMENT_NODE )
+      {
+        _rPrintTab();
+        fwprintf ( fp, L"<%hs", cur_node->name );
+        for ( xmlAttrPtr attr = cur_node->properties; attr; attr = attr->next )
+        {
+          fwprintf ( fp, L" %hs", attr->name );
+          if ( attr->children )
+          {
+            WCHAR w[kPathMaxLen];
+            rUTF8_ToWide ( XML_GET_CONTENT ( attr->children ), xmlStrlen( XML_GET_CONTENT ( attr->children ) ), w );
+            fwprintf ( fp, L"=\"%s\"", w );
+          }
+        }
+        fwprintf ( fp, L">\n" );
+
+        ++d;
+        _rPrint_e ( cur_node->children );
+        --d;
+        _rPrintTab();
+        fwprintf ( fp, L"</%hs>\n", cur_node->name );
+      }
+      else
+      if ( cur_node->type == XML_TEXT_NODE )
+      {
+        WCHAR w[kPathMaxLen];
+        rUTF8_ToWide ( XML_GET_CONTENT ( cur_node ), xmlStrlen( XML_GET_CONTENT ( cur_node ) ), w );
+        _rPrintTab();
+        fwprintf ( fp, L"#text: %s\n", w );
+        switch ( iState )
+        {
+          case kPIXS_kNull:
+            if ( memcmp ( L"Инклинометрия", w+1, sizeof(WCHAR)*14 ) == 0 )
+            {
+              iState = kPIXS_kSearchedTitle;
+            }
+            break;
+        }
+      }
+      else
+      {
+        _rPrintTab();
+        fwprintf ( fp, L"<%hs>", cur_node->name );
+        fwprintf ( fp, L"%-16s\n", _rNodeType(cur_node->type) );
+        ++d;
+        _rPrint_e ( cur_node->children );
+        --d;
+        _rPrintTab();
+        fwprintf ( fp, L"</%hs>\n", cur_node->name );
+      }
+    }
+  }
+  _rPrint_e ( root_element );
+  fclose ( fp );
+  return iErr;
+}
+
+static UINT rParseInkl_Docx ( const LPCWSTR w7 )
+{
+  UINT iErr = 0;
+  struct archive * const ar = archive_read_new();
+  archive_read_support_filter_all ( ar );
+  archive_read_support_format_all ( ar );
+  FILE * const pf = _wfopen ( w7+1, L"rb" );
+  assert ( pf );
+  if ( archive_read_open_FILE ( ar, pf ) != ARCHIVE_OK )
+  {
+    rLog_Error ( L"archive_read_open_FILE (\"%s\")\n", w7+1 );
+    iErr = __LINE__;
+    goto P_Err;
+  }
+  else
+  {
+    struct archive_entry *are;
+    while ( archive_read_next_header ( ar, &are ) == ARCHIVE_OK )
+    {
+      const UINT n = (UINT)archive_entry_size(are);
+      LPCWSTR pName = archive_entry_pathname_w(are);
+      LPCWSTR pName2 = L"word/document.xml";
+      BOOL b = TRUE;
+      while ( b )
+      {
+        if ( iswalpha ( *pName2 ) && iswalpha ( *pName ) )
+        {
+          b &= ((*pName2)&0x1f) == ((*pName)&0x1f);
+        }
+        else
+        if ( ((*pName2) == '/') || ((*pName2) == '\\') )
+        {
+          b &= ((*pName) == '/' || (*pName) == '\\');
+        }
+        else
+        {
+          b &= (*pName) == (*pName2);
+          if ( (*pName2) == 0 )
+          {
+            BYTE buf[n+256];
+            la_ssize_t aer = archive_read_data ( ar, buf, n+256 );
+            if ( aer < 0 ) { aer = archive_read_data ( ar, buf, n+256 ); }
+            if ( aer != n ) { rLog_Error ( L"archive_read_data [%d/%u] (\"%s\")\n", aer, n, w7+1 ); }
+            xmlDocPtr doc = xmlReadMemory ( (LPCSTR)buf, aer, "document.xml", NULL, 0 );
+            if ( doc == NULL )
+            {
+              rLog_Error ( L"Ошибка в парсинге xml файла в документе word\n" );
+              iErr = __LINE__;
+              goto P_Err;
+            }
+            else
+            {
+              iErr = rParseInkl_Xml ( doc, w7 );
+            }
+            xmlFreeDoc ( doc );
+            goto P_Err;
+          }
+        }
+        ++pName; ++pName2;
+      }
+      archive_read_data_skip ( ar );
+    }
+  }
+  P_Err:
+  if ( archive_read_free ( ar ) != ARCHIVE_OK )
+  {
+    rLog_Error ( L"archive_read_free (\"%s\")\n", w7+1 );
+  }
+  fclose ( pf );
+  return iErr;
+}
+
+static UINT rParseIncl_All ( const LPWSTR w7 )
+{
+  const UINT l = w7[0];
+  UINT iErr = 0;
+  rW7_add ( w7, L"/*" );
+  WIN32_FIND_DATA ffd;
+  const HANDLE hFind = FindFirstFile ( w7+1, &ffd );
+  if ( hFind == INVALID_HANDLE_VALUE )
+  {
+    rLog_Error_WinAPI ( L"FindFirstFile", GetLastError(), L"(\"%s\")\n", w7+1 );
+    return __LINE__;
+  }
+  w7[0] = l; w7[w7[0]+1] = 0;
+
+  do
+  {
+    rW7_addf ( w7, L"/%s", ffd.cFileName );
+
+    if ( rW7_PathWithEndOf_W7 ( w7, L"\x05.docx" ) )
+    {
+      if ( ( iErr = rParseInkl_Docx ( w7 ) ) ) { goto P_Err; }
+    }
+
+    w7[0] = l; w7[w7[0]+1] = 0;
+  } while ( FindNextFile ( hFind, &ffd ) );
+  P_Err:
+  w7[0] = l; w7[w7[0]+1] = 0;
+  FindClose ( hFind );
+  return iErr;
+}
+
+
 
 static UINT rScriptRun_Parse_AR ( const LPWSTR w7, struct archive * const ar )
 {
@@ -1410,7 +1692,7 @@ static UINT rScriptRun_Parse_AR ( const LPWSTR w7, struct archive * const ar )
       la_ssize_t aer = archive_read_data ( ar, buf, n+256 );
       if ( aer < 0 ) { aer = archive_read_data ( ar, buf, n+256 ); }
       if ( aer != n ) { rLog_Error ( L"archive_read_data [%d/%u] (\"%s\")\n", aer, n, w7+1 ); }
-      rParseIncl ( w7, buf, n );
+      rParseIncl_Prepare ( w7, buf, n );
       --gScript.nFilesIncl;
       ++gScript.nFilesParsed;
       if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
@@ -1511,7 +1793,7 @@ static UINT rScriptRun_Parse_FFD ( const LPWSTR w7, WIN32_FIND_DATA * const _ffd
       const UINT n = _ffd->nFileSizeLow;
       BYTE buf[n+1];
       rLoadFile ( buf, w7+1, n );
-      rParseIncl ( w7, buf, n );
+      rParseIncl_Prepare ( w7, buf, n );
       --gScript.nFilesIncl;
       ++gScript.nFilesParsed;
       if ( gScript.nFilesParsed % kFilesParsedPrint == 0 )
@@ -1557,6 +1839,11 @@ static UINT rScriptRun_Parse ( )
   D7_printf ( "Обработано файлов: %u\n", gScript.nFilesParsed );
   D7_printf ( "Осталось обработать [LAS:%u] [INCL:%u]\n", gScript.nFilesLas, gScript.nFilesIncl );
   D7_printf ( "Файлов с ошибками %u\n", gScript.nFilesError );
+
+  WCHAR _w7_[kPathMaxLen];
+  rW7_setf ( _w7_, L"%s/.ag47/temp_inkl/", gScript.w7PathOut+1 );
+  rScriptRun_DocToDocx ( _w7_+1 );
+  rParseIncl_All ( _w7_ );
 
   gScript.iState = kSSR_Parse;
   return 0;
@@ -2094,7 +2381,6 @@ static VOID rParseLasData ( BYTE const * const pData, const UINT nSize )
         // считываем значение
         double f = strtod ( (LPCSTR)p, &pp );
         // если он не близок к значению NULL, т.е. значение существует
-        #define kAsciiDataErr 0.01
         if ( fabs ( f-fD[3] ) > kAsciiDataErr )
         {
           // если верхняя граница ниже настоящего значения, то записываем и с другой границе также
@@ -2264,162 +2550,25 @@ static UINT rParsePath ( )
 
 
 
-static UINT rScriptRun_DocToDocx ( )
-{
-}
-
-static UINT rSearchWordConv ( )
-{
-  WIN32_FIND_DATA ffd;
-  const HANDLE hFind = FindFirstFile ( L"C:/Program Files (x86)/Microsoft Office/Office*", &ffd );
-  if ( hFind == INVALID_HANDLE_VALUE )
-  {
-    D7_printf ( "Невозможно найти папку с установленным MS Office\n" );
-    FindClose ( hFind );
-    return __LINE__;
-  }
-  do
-  {
-    rW7_setf ( g_w7PathToWordConv, L"C:/Program Files (x86)/Microsoft Office/%s/wordconv.exe", ffd.cFileName );
-    WIN32_FIND_DATA _ffd;
-    const HANDLE _hFind = FindFirstFile ( g_w7PathToWordConv+1, &_ffd );
-    if ( _hFind != INVALID_HANDLE_VALUE )
-    {
-      D7_printf ( "wordconv.exe найден по пути: %ls\n", g_w7PathToWordConv+1 );
-      FindClose ( _hFind );
-      FindClose ( hFind );
-      return 0;
-    }
-  } while ( FindNextFile ( hFind, &ffd ) );
-  FindClose ( hFind );
-  return __LINE__;
-}
 
 INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
 {
+  UINT iErr = 0;
   LIBXML_TEST_VERSION
 
-  UINT k = 0;
-  {
-    struct archive * const ar = archive_read_new();
-    archive_read_support_filter_all ( ar );
-    archive_read_support_format_all ( ar );
-    WCHAR w7[kPathMaxLen];
-    rW7_setf ( w7, L"%s/%s", L"F:/ARGilyazeev/github/Ag47/.ag47/.ag47/temp_inkl", L"2250 Икнлинометрия.doc.docx" );
-    FILE * const pf = _wfopen ( w7+1, L"rb" );
-    assert ( pf );
-    if ( archive_read_open_FILE ( ar, pf ) != ARCHIVE_OK )
-    {
-      rLog_Error ( L"archive_read_open_FILE (\"%s\")\n", w7+1 );
-      k = __LINE__;
-      goto P_Err;
-    }
-    else
-    {
-      struct archive_entry *are;
-      while ( archive_read_next_header ( ar, &are ) == ARCHIVE_OK )
-      {
-        const UINT nSize = (UINT)archive_entry_size(are);
-        LPCWSTR pName = archive_entry_pathname_w(are);
-        LPCWSTR pName2 = L"word/document.xml";
-        BOOL b = TRUE;
-        while ( b )
-        {
-          if ( iswalpha ( *pName2 ) && iswalpha ( *pName ) )
-          {
-            b &= ((*pName2)&0x1f) == ((*pName)&0x1f);
-          }
-          else
-          if ( ((*pName2) == '/') || ((*pName2) == '\\') )
-          {
-            b &= ((*pName) == '/' || (*pName) == '\\');
-          }
-          else
-          {
-            b &= (*pName) == (*pName2);
-            if ( (*pName2) == 0 )
-            {
-              BYTE abData[nSize+1];
-              // Парсим Las файл из архива
-              archive_read_data ( ar, abData, nSize+1 );
-              xmlDocPtr doc = xmlReadMemory ( abData, nSize, "document.xml", NULL, 0 );
-              if ( doc == NULL )
-              {
-                fprintf(stderr, "Failed to parse document\n");
-              }
-              else
-              {
-                FILE * const fp = rOpenFileToWriteWith_UTF16_BOM ( L".ag47/doc.log" );
-                fwprintf ( fp, L"encode = %hs\n", doc->encoding );
-                xmlNodePtr root_element = xmlDocGetRootElement ( doc );
-                UINT d = 0;
+  WCHAR w7[kPathMaxLen];
+  rW7_setf ( w7, L"./.ag47/.ag47/temp_inkl/" );
+  iErr = rParseIncl_All ( w7 );
 
-                VOID print_e ( xmlNodePtr a_node )
-                {
-                  for (  xmlNodePtr cur_node = a_node; cur_node; cur_node = cur_node->next)
-                  {
-                    fwprintf ( fp, L"%.*s<%hs>",
-                            d, L"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
-                            cur_node->name );
-                    for ( xmlAttrPtr at_node = cur_node->properties; at_node; at_node = at_node->next)
-                    {
-                      xmlNodePtr val = at_node->children;
-                      if ( val )
-                      {
+  xmlCleanupParser();
 
-                      }
-                      else
-                      {
-                        fwprintf ( fp, L"    %hs", at_node->name ) ;
-                      }
-                    }
-
-                    fwprintf ( fp, L"\n" ) ;
-                    if ( XML_GET_CONTENT ( cur_node ) )
-                    {
-                      WCHAR w[kPathMaxLen];
-                      rUTF8_ToWide ( XML_GET_CONTENT ( cur_node ), xmlStrlen( XML_GET_CONTENT ( cur_node ) ), w );
-                      fwprintf ( fp, L"%.*s^^ %s\n",
-                              d, L"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t", w );
-                    }
-                    ++d;
-                    print_e(cur_node->children );
-                    --d;
-                  }
-                }
-                print_e ( root_element );
-              }
-              xmlFreeDoc ( doc );
-              goto P_Err;
-            }
-          }
-          ++pName; ++pName2;
-        }
-        archive_read_data_skip ( ar );
-      }
-    }
-    P_Err:
-    if ( archive_read_free ( ar ) != ARCHIVE_OK )
-    {
-      rLog_Error ( L"archive_read_free (\"%s\")\n", w7+1 );
-    }
-    fclose ( pf );
-    goto P_End;
-  }
-
-
-  return 0;
-  if ( ( k = rSearchWordConv ( ) ) ) goto P_End;
-  WCHAR cmd[kPathMaxLen];
-  LPCWSTR lp = L"F:/ARGilyazeev/github/Ag47/.ag47/.ag47/temp_inkl";
-  rW7_setf ( cmd, L"for %%W in (%s/*.doc) do (\"%s\" -oice -nme \"%s/%%~nxW\" \"%s/%%~nxW.docx\")", lp, g_w7PathToWordConv+1, lp, lp );
-  _wsystem ( cmd+1 );
+  return iErr;
 
   //for %A in (F:/ARGilyazeev/github/Ag47/.ag47/.ag47/temp_inkl/*.doc) do (echo "%~nA" )
   return 0;
   if ( argc == 1 )
   {
-    if ( ( k = rScriptOpen ( L".ag47-script" ) ) ) goto P_End;
+    if ( ( iErr = rScriptOpen ( L".ag47-script" ) ) ) goto P_End;
   }
   P_End:
     rLog ( NULL );
@@ -2428,7 +2577,7 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
     rLogMethods ( NULL );
     rLogTable ( NULL );
     xmlCleanupParser();
-    return k;
+    return iErr;
 
 
   // D7_printf ( "setlocale: %s\n", setlocale ( LC_ALL, "" ) );
