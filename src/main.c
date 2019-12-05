@@ -275,7 +275,7 @@ static LPVOID rV7_Alloc ( const UINT nElementSize, UINT nCount )
   u[0] = nCount;
   u[1] = 0;
   u[2] = nElementSize;
-  u[4] = 0xFEF0;
+  u[3] = 0xFEF0;
   const LPVOID o = (LPVOID)(u+4);
   memset ( o, 0, u[0]*u[2] );
   return o;
@@ -291,7 +291,7 @@ static LPVOID rV7_Copy ( const LPVOID v7, UINT nCount )
   const LPVOID _v7 = rV7_Alloc ( rV7_GetHeadPtr ( v7 ) [2], nCount );
   UINT16 * const u = rV7_GetHeadPtr ( _v7 );
   u[1] =  rV7_GetHeadPtr ( v7 ) [1];
-  memcpy ( _v7, v7, rV7_GetHeadPtr ( v7 ) [2] * u[1]  );
+  memcpy ( _v7, v7, u[2] * u[1]  );
   return _v7;
 }
 // Освобождает вектор
@@ -1445,6 +1445,12 @@ static UINT rParseInkl_Xml ( xmlDocPtr doc, const LPCWSTR w7 )
   BOOL bDataTAz = FALSE;
   BOOL bDataTTAn;
   BOOL bDataTTAz;
+  BOOL bEnd = FALSE;
+  struct _s
+  {
+    double d1,d2,d3;
+    UINT b2,b3;
+  } *v7 = rV7_Alloc ( sizeof(struct _s), 0 ), kS = { };
 
   VOID _rPrintTab ( )
   {
@@ -1546,7 +1552,7 @@ static UINT rParseInkl_Xml ( xmlDocPtr doc, const LPCWSTR w7 )
                 i+=10;
                 fAlt = _wtof ( w+i );
                 bAlt = TRUE;
-                rLog ( L"%-16s [%f] >>>%-64s %s\n\n", L"Альтитуда", fAlt, w, w7+1 );
+                rLog ( L"%-16s [%f] >>>%-64s %s\n", L"Альтитуда", fAlt, w, w7+1 );
               }
               if ( !bIn && rWideCmpWords ( L"Угол склонения:", w+i ) )
               {
@@ -1657,9 +1663,102 @@ static UINT rParseInkl_Xml ( xmlDocPtr doc, const LPCWSTR w7 )
                 rLog ( L"%-16s [%s] >>>%-64s %s\n", L"Азимут", bDataTTAn?L"минуты":L"градусы", w, w7+1 );
               }
 
-              if ( bDataTAn && bDataTAz )
+              if ( !bEnd && bDataTAn && bDataTAz )
               {
                 // Ищем табличные значения
+                xmlNodePtr pTable = cur_node->parent;
+                while ( strcmp ( pTable->name, "tr" ) ) { pTable = pTable->parent; }
+                pTable = pTable->next->children;
+                while ( strcmp ( pTable->name, "tc" ) ) { pTable = pTable->next; }
+
+                VOID _r1( xmlNodePtr pN )
+                {
+                  for ( ; pN; pN = pN->next )
+                  {
+                    _r1 ( pN->children );
+                    if ( strcmp(pN->name, "p") == 0 )
+                    {
+                      xmlChar * p = xmlNodeGetContent  ( pN );
+                      kS.d1 = atof( p );
+                      xmlFree ( p );
+                      v7 = rV7_Add ( v7, &kS );
+                    }
+                  }
+                }
+                _r1(pTable->children);
+                UINT i2 = 0;
+                VOID _r2( xmlNodePtr pN )
+                {
+                  for ( ; pN; pN = pN->next )
+                  {
+                    _r2 ( pN->children );
+                    if ( strcmp(pN->name, "p") == 0 )
+                    {
+                      xmlChar * p = xmlNodeGetContent  ( pN );
+                      if ( *p == '*' )
+                      {
+                        v7[i2].b2 = 1;
+                        v7[i2].d2 = atof( p+1 );
+                      }
+                      else
+                      if ( isdigit ( *p ) || *p == '-' )
+                      {
+                        v7[i2].d2 = atof( p );
+                      }
+                      else
+                      {
+                        v7[i2].b2 = 2;
+                      }
+                      xmlFree ( p );
+                      if ( bDataTTAn )
+                      {
+                        const double d = modf ( v7[i2].d2 , &v7[i2].d2 );
+                        v7[i2].d2 += d * (100.0/60.0);
+                      }
+                      ++i2;
+                    }
+                  }
+                }
+                pTable = pTable->next;
+                UINT i3 = 0;
+                _r2(pTable->children);
+                VOID _r3( xmlNodePtr pN )
+                {
+                  for ( ; pN; pN = pN->next )
+                  {
+                    _r3 ( pN->children );
+                    if ( strcmp(pN->name, "p") == 0 )
+                    {
+                      xmlChar * p = xmlNodeGetContent  ( pN );
+                      if ( *p == '*' )
+                      {
+                        v7[i3].b3 = 1;
+                        v7[i3].d3 = atof( p+1 );
+                      }
+                      else
+                      if ( isdigit ( *p ) || *p == '-' )
+                      {
+                        v7[i3].d3 = atof( p );
+                      }
+                      else
+                      {
+                        v7[i3].b3 = 2;
+                      }
+                      xmlFree ( p );
+                      if ( bDataTTAn )
+                      {
+                        const double d = modf ( v7[i3].d3 , &v7[i3].d3 );
+                        v7[i3].d3 += d * (100.0/60.0);
+                      }
+                      v7[i3].d3 += fIn;
+                      ++i3;
+                    }
+                  }
+                }
+                pTable = pTable->next;
+                _r3(pTable->children);
+                bEnd = TRUE;
+                rLog ( L"%-16s [%u/%u/%u] >>>                      %s\n", L"Таблица", rV7_GetSize(v7), i2, i3, w7+1 );
               }
             }
           }
@@ -1702,6 +1801,42 @@ static UINT rParseInkl_Xml ( xmlDocPtr doc, const LPCWSTR w7 )
   }
   _rPrint_e ( root_element );
   fclose ( fp );
+
+  if ( bEnd )
+  {
+    rW7_setf ( __w7, L"%s.log", w7+1 );
+    FILE * const pf = _wfopen ( __w7+1, L"wb" );
+    if ( !pf )
+    {
+      rLog_Error ( L"Невозможно окткрыть файл для записи %s\n", __w7+1 );
+    }
+    const UINT n = rV7_GetSize ( v7 );
+    fprintf ( pf, "%u\n", n );
+    for ( UINT k = 0; k < n; ++k )
+    {
+      fprintf ( pf, "%f", v7[k].d1 );
+      if ( v7[k].b2 != 2 )
+      {
+        fprintf ( pf, "\t%s%f", v7[k].b2?"*":"", v7[k].d2 );
+      }
+      else
+      {
+        fprintf ( pf, "\t" );
+      }
+      if ( v7[k].b3 != 2 )
+      {
+        fprintf ( pf, "\t%s%f", v7[k].b3?"*":"", v7[k].d3 );
+      }
+      else
+      {
+        fprintf ( pf, "\t" );
+      }
+      fprintf ( pf, "\n" );
+    }
+    fclose ( pf );
+  }
+
+  rV7_Free ( v7 );
   return iErr;
 }
 
