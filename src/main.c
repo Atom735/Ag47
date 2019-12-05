@@ -1440,6 +1440,11 @@ static UINT rParseInkl_Xml ( xmlDocPtr doc, const LPCWSTR w7 )
   double fIn = 0;
   BOOL bAlt = FALSE;
   double fAlt = 0;
+  BOOL bDataT = FALSE;
+  BOOL bDataTAn = FALSE;
+  BOOL bDataTAz = FALSE;
+  BOOL bDataTTAn;
+  BOOL bDataTTAz;
 
   VOID _rPrintTab ( )
   {
@@ -1534,14 +1539,14 @@ static UINT rParseInkl_Xml ( xmlDocPtr doc, const LPCWSTR w7 )
                 i+=10;
                 iWell = _wtoi ( w+i );
                 bWell = TRUE;
-                rLog ( L"WELL: [%u] \"%s\" %s\n", iWell, w, w7+1 );
+                rLog ( L"%-16s [%u] >>>%-64s %s\n", L"Скважина", iWell, w, w7+1 );
               }
               if ( !bAlt && rWideCmpWords ( L"Альтитуда:", w+i ) )
               {
                 i+=10;
                 fAlt = _wtof ( w+i );
                 bAlt = TRUE;
-                rLog ( L"ALT: [%f] \"%s\" %s\n", fAlt, w, w7+1 );
+                rLog ( L"%-16s [%f] >>>%-64s %s\n\n", L"Альтитуда", fAlt, w, w7+1 );
               }
               if ( !bIn && rWideCmpWords ( L"Угол склонения:", w+i ) )
               {
@@ -1583,9 +1588,78 @@ static UINT rParseInkl_Xml ( xmlDocPtr doc, const LPCWSTR w7 )
                     fIn += labs(v1);
                     if ( v1 < 0 ) { fIn = -fIn; }
                     bIn = TRUE;
-                    rLog ( L"INKL: [%f] \"%s\" %s\n", fIn, w, w7+1 );
+                    rLog ( L"%-16s [%f] >>>%-64s %s\n", L"Угол склонения", fIn, w, w7+1 );
                   }
                 }
+              }
+            }
+            if ( !bDataT && rWideCmpWords ( L"Глубина", w ) )
+            {
+              bDataT = TRUE;
+              rLog ( L"%-16s >>>%-64s %s\n", L"Глубина", w, w7+1 );
+            }
+            else
+            if ( bDataT )
+            {
+              if ( !bDataTAn && rWideCmpWords ( L"Угол", w ) )
+              {
+                for ( UINT k=4; w[k]; ++k )
+                {
+                  if ( rWideCmpWords ( L"град", w+k ) || rWideCmpWords ( L"градусы", w+k ) )
+                  {
+                    k += 4;
+                    for (; w[k]; ++k )
+                    {
+                      if ( rWideCmpWords ( L"град", w+k ) || rWideCmpWords ( L"градусы", w+k ) )
+                      {
+                        bDataTTAn = FALSE;
+                        break;
+                      }
+                      else
+                      if ( rWideCmpWords ( L"минуты", w+k ) || rWideCmpWords ( L"мин", w+k ) )
+                      {
+                        bDataTTAn = TRUE;
+                        break;
+                      }
+                    }
+                    break;
+                  }
+                }
+                bDataTAn = TRUE;
+                rLog ( L"%-16s [%s] >>>%-64s %s\n", L"Угол", bDataTTAn?L"минуты":L"градусы", w, w7+1 );
+              }
+              else
+              if ( !bDataTAz && rWideCmpWords ( L"Азимут", w ) )
+              {
+                for ( UINT k=4; w[k]; ++k )
+                {
+                  if ( rWideCmpWords ( L"град", w+k ) || rWideCmpWords ( L"градусы", w+k ) )
+                  {
+                    k += 4;
+                    for (; w[k]; ++k )
+                    {
+                      if ( rWideCmpWords ( L"град", w+k ) || rWideCmpWords ( L"градусы", w+k ) )
+                      {
+                        bDataTTAz = FALSE;
+                        break;
+                      }
+                      else
+                      if ( rWideCmpWords ( L"минуты", w+k ) || rWideCmpWords ( L"мин", w+k ) )
+                      {
+                        bDataTTAz = TRUE;
+                        break;
+                      }
+                    }
+                    break;
+                  }
+                }
+                bDataTAz = TRUE;
+                rLog ( L"%-16s [%s] >>>%-64s %s\n", L"Азимут", bDataTTAn?L"минуты":L"градусы", w, w7+1 );
+              }
+
+              if ( bDataTAn && bDataTAz )
+              {
+                // Ищем табличные значения
               }
             }
           }
@@ -1594,7 +1668,7 @@ static UINT rParseInkl_Xml ( xmlDocPtr doc, const LPCWSTR w7 )
           if ( rWideCmpWords ( L"Инклинометрия", w ) )
           {
             bTitled = TRUE;
-            rLog ( L"TITLE: \"%s\" %s\n", w, w7+1 );
+            rLog ( L"\n\n%-80s %s\n", w, w7+1 );
           }
         }
 
