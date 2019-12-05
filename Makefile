@@ -41,6 +41,6 @@ all : main.exe
 	main
 
 main.exe : src/main.c
-	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) $^ $(LDFLAGS) -O3
+	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $^ $(LDFLAGS) -O3
 
 

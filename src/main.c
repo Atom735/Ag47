@@ -1,4 +1,6 @@
-﻿#include <windows.h>
+﻿#define IN_LIBXML
+
+#include <windows.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -16,9 +18,11 @@
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <libxml/globals.h>
 
 #include "cyrillic.c"
 #include "crc32.c"
+#include "ag47_strings.c"
 
 // [\x00-\x09\x0B-\x1f]
 // F:\ARGilyazeev\github\Ag47\t_data\2012г\2253\2253_1.09\z2253_NC_ок.doc
@@ -26,12 +30,38 @@
 // wordconv.exe -oice -nme <input file> <output file>
 // wordconv.exe -oice -nme "F:\ARGilyazeev\github\Ag47\t_data\2012г\2253\2253_1.09\z2253_NC_ок.doc" "F:\ARGilyazeev\github\Ag47\.ag47\.ag47\NC.docx"
 
+
+
 #define kPathMaxLen 512
 UINT kFilesParsedPrint = 0xff;
 WCHAR g_w7PathToWordConv[kPathMaxLen] = { };
 
 // #define D7_printf(...) wprintf ( L##__VA_ARGS__ )
 #define D7_printf(...) printf ( __VA_ARGS__ )
+
+static UINT rWideCmpWords ( LPCWSTR w1, LPCWSTR w2 )
+{
+  UINT i = 0;
+  while ( *w1 && *w2 )
+  {
+    if ( (((*w1) >= L'a' && (*w1) <= L'z') || ((*w1) >= L'A' && (*w1) <= L'Z') || ((*w1) >= L'а' && (*w1) <= L'я') || ((*w1) >= L'А' && (*w1) <= L'Я')) &&
+         (((*w2) >= L'a' && (*w2) <= L'z') || ((*w2) >= L'A' && (*w2) <= L'Z') || ((*w2) >= L'а' && (*w2) <= L'я') || ((*w2) >= L'А' && (*w2) <= L'Я')) )
+    {
+      if ( ((*w1)&(0xffff-0x20)) != ((*w2)&(0xffff-0x20)) ) return 0;
+    }
+    else
+    if ( (*w1) != (*w2) ) return 0;
+    ++i; ++w1; ++w2;
+  }
+  if ( (((*w1) >= L'a' && (*w1) <= L'z') || ((*w1) >= L'A' && (*w1) <= L'Z') || ((*w1) >= L'а' && (*w1) <= L'я') || ((*w1) >= L'А' && (*w1) <= L'Я')) ||
+       (((*w2) >= L'a' && (*w2) <= L'z') || ((*w2) >= L'A' && (*w2) <= L'Z') || ((*w2) >= L'а' && (*w2) <= L'я') || ((*w2) >= L'А' && (*w2) <= L'Я')) ||
+        ((*w1) >= L'0' && (*w1) <= L'9') ||
+        ((*w2) >= L'0' && (*w2) <= L'9') || ((*w1) == L'_') || ((*w2) == L'_') )
+  {
+    return 0;
+  }
+  return i;
+}
 
 static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
 {
@@ -1392,24 +1422,24 @@ static UINT rParseIncl_Prepare ( const LPCWSTR w7, BYTE * p, UINT n )
   return 0;
 }
 
-static UINT rParseInkl_Xml ( xml, w7DocPtr doc, const LPCWSTR w7 )
+static UINT rParseInkl_Xml ( xmlDocPtr doc, const LPCWSTR w7 )
 {
-  enum
-  {
-      kPIXS_kNull = 0,
-      kPIXS_kSearchedTitle, // Поиск загаловка "Инклинометрия"
-      kPIXS_kGetWell, // Поиск номера скважины
-      kPIXS_kGetIncl, // Поиск угла склонения
-      kPIXS_kGetAlt, // Поиск альтитуды
-      kPIXS_kGetEnd, // Поиск забоя
-      kPIXS_kData, // Поиск таблицы данных
-  };
-  FILE * const fp = rOpenFileToWriteWith_UTF16_BOM ( L".ag47/doc.xml" );
+  WCHAR __w7[kPathMaxLen];
+  rW7_setf ( __w7, L"%s.xml", w7+1 );
+  FILE * const fp = rOpenFileToWriteWith_UTF16_BOM ( __w7+1 );
   UINT iErr = 0;
   fwprintf ( fp, L"Encode = %hs\n", doc->encoding );
+  fwprintf ( fp, L"Origin = %s\n", w7+1 );
   xmlNodePtr root_element = xmlDocGetRootElement ( doc );
   UINT d = 0;
-  UINT iState = kPIXS_kNull;
+
+  BOOL bTitled = FALSE;
+  BOOL bWell = FALSE;
+  UINT iWell = 0;
+  BOOL bIn = FALSE;
+  double fIn = 0;
+  BOOL bAlt = FALSE;
+  double fAlt = 0;
 
   VOID _rPrintTab ( )
   {
@@ -1485,6 +1515,88 @@ static UINT rParseInkl_Xml ( xml, w7DocPtr doc, const LPCWSTR w7 )
           }
         }
         fwprintf ( fp, L">\n" );
+        // Нашли параграф
+        if ( strcmp ( cur_node->name, "p" ) == 0 )
+        {
+          xmlChar * p = xmlNodeGetContent  ( cur_node );
+          WCHAR w[kPathMaxLen];
+          const UINT i = rUTF8_ToWide ( p, xmlStrlen( p ), w );
+          xmlFree ( p );
+          _rPrintTab();
+          fwprintf ( fp, L"<!-- %s -->\n", w );
+          // Если это уже файл с инклинометрией, ищем необходимые данные
+          if ( bTitled )
+          {
+            for ( UINT i=0; w[i]; ++i )
+            {
+              if ( !bWell && rWideCmpWords ( L"Скважина N", w+i ) )
+              {
+                i+=10;
+                iWell = _wtoi ( w+i );
+                bWell = TRUE;
+                rLog ( L"WELL: [%u] \"%s\" %s\n", iWell, w, w7+1 );
+              }
+              if ( !bAlt && rWideCmpWords ( L"Альтитуда:", w+i ) )
+              {
+                i+=10;
+                fAlt = _wtof ( w+i );
+                bAlt = TRUE;
+                rLog ( L"ALT: [%f] \"%s\" %s\n", fAlt, w, w7+1 );
+              }
+              if ( !bIn && rWideCmpWords ( L"Угол склонения:", w+i ) )
+              {
+                i+=15;
+                LPWSTR pp;
+                LONG v1 = wcstol ( w+i, &pp, 10 );
+                if ( pp != w+i )
+                {
+                  LPWSTR pp2;
+                  ULONG v2 = wcstoul ( pp+1, &pp2, 10 );
+                  if ( pp != pp2 )
+                  {
+                    fIn = v2;
+                    UINT sv2 = ((UINT_PTR)(pp2)-(UINT_PTR)(pp+1))/2;
+                    for ( UINT k = 0; k < sv2; ++k ) { fIn /= 10.0; }
+                    pp = pp2;
+                    for ( UINT k=i; w[k]; ++k )
+                    {
+                      if ( rWideCmpWords ( L"град", w+k ) || rWideCmpWords ( L"градусы", w+k ) )
+                      {
+                        k += 4;
+                        for (; w[k]; ++k )
+                        {
+                          if ( rWideCmpWords ( L"град", w+k ) || rWideCmpWords ( L"градусы", w+k ) )
+                          {
+                            break;
+                          }
+                          else
+                          if ( rWideCmpWords ( L"минуты", w+k ) || rWideCmpWords ( L"мин", w+k ) )
+                          {
+                            fIn *= 100.0/60.0;
+                            break;
+                          }
+                        }
+                        break;
+                      }
+                    }
+                    // TODO определить значение после запятой
+                    fIn += labs(v1);
+                    if ( v1 < 0 ) { fIn = -fIn; }
+                    bIn = TRUE;
+                    rLog ( L"INKL: [%f] \"%s\" %s\n", fIn, w, w7+1 );
+                  }
+                }
+              }
+            }
+          }
+          // Проверяем на возможность этого файла как файла с инклинометрией
+          else
+          if ( rWideCmpWords ( L"Инклинометрия", w ) )
+          {
+            bTitled = TRUE;
+            rLog ( L"TITLE: \"%s\" %s\n", w, w7+1 );
+          }
+        }
 
         ++d;
         _rPrint_e ( cur_node->children );
@@ -1496,18 +1608,10 @@ static UINT rParseInkl_Xml ( xml, w7DocPtr doc, const LPCWSTR w7 )
       if ( cur_node->type == XML_TEXT_NODE )
       {
         WCHAR w[kPathMaxLen];
-        rUTF8_ToWide ( XML_GET_CONTENT ( cur_node ), xmlStrlen( XML_GET_CONTENT ( cur_node ) ), w );
+        const UINT i = rUTF8_ToWide ( XML_GET_CONTENT ( cur_node ), xmlStrlen( XML_GET_CONTENT ( cur_node ) ), w );
         _rPrintTab();
-        fwprintf ( fp, L"#text: %s\n", w );
-        switch ( iState )
-        {
-          case kPIXS_kNull:
-            if ( memcmp ( L"Инклинометрия", w+1, sizeof(WCHAR)*14 ) == 0 )
-            {
-              iState = kPIXS_kSearchedTitle;
-            }
-            break;
-        }
+        fwprintf ( fp, L"#text: (%u)%s\n", i, w );
+        // rLog ( L"#text: (%u)%s\n", i, w );
       }
       else
       {
@@ -1619,7 +1723,7 @@ static UINT rParseIncl_All ( const LPWSTR w7 )
 
     if ( rW7_PathWithEndOf_W7 ( w7, L"\x05.docx" ) )
     {
-      if ( ( iErr = rParseInkl_Docx ( w7 ) ) ) { goto P_Err; }
+      if ( ffd.cFileName[0] != '~' && ( iErr = rParseInkl_Docx ( w7 ) ) ) { goto P_Err; }
     }
 
     w7[0] = l; w7[w7[0]+1] = 0;
@@ -2556,9 +2660,18 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
   UINT iErr = 0;
   LIBXML_TEST_VERSION
 
+  rLog ( L"ptr UINT[-1] = %p\n", ((UINT*)(&iErr))-1 );
+  rLog ( L"ptr UINT[+0] = %p\n", ((UINT*)(&iErr)) );
+  rLog ( L"ptr UINT[+1] = %p\n", ((UINT*)(&iErr))+1 );
+  LPVOID pE = &iErr;
+  rLog ( L"ptr VOID[-1] = %p\n", ((VOID*)pE)-1 );
+  rLog ( L"ptr VOID[+0] = %p\n", ((VOID*)pE) );
+  rLog ( L"ptr VOID[+1] = %p\n", ((VOID*)pE)+1 );
+
   WCHAR w7[kPathMaxLen];
   rW7_setf ( w7, L"./.ag47/.ag47/temp_inkl/" );
   iErr = rParseIncl_All ( w7 );
+
 
   xmlCleanupParser();
 
@@ -2578,6 +2691,8 @@ INT wmain ( INT argc, WCHAR const *argv[], WCHAR const *envp[] )
     rLogTable ( NULL );
     xmlCleanupParser();
     return iErr;
+
+
 
 
   // D7_printf ( "setlocale: %s\n", setlocale ( LC_ALL, "" ) );
