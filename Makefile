@@ -23,5 +23,5 @@ LDFLAGS := \
 all : main.exe
 	main
 
-main.exe : src/main.c
-	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $^ $(LDFLAGS) -O3
+main.exe : src/main.c src/ag47_arrays.c
+	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $< $(LDFLAGS) -O3
