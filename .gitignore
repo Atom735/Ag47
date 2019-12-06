@@ -1,5 +1,8 @@
+.ag47
+t_data
 *.lnk
 *.sublime-workspace
+*.log
 
 # Prerequisites
 *.d
