@@ -30,9 +30,10 @@ DEPENDS := \
   src/ag47_arrays.c \
   src/ag47_fs.c \
 
+OUT_EXE := main.exe
 
-all : main.exe
-	main
+all : $(OUT_EXE)
+	$(OUT_EXE)
 
-main.exe : src/main.c $(DEPENDS)
+$(OUT_EXE) : src/main.c $(DEPENDS)
 	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $< $(LDFLAGS) -O3
