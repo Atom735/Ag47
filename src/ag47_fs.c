@@ -29,9 +29,10 @@ static UINT rFS_Run_Wait ( const LPWSTR cmd )
 static LPWSTR g_s4wPathToWordConv = NULL;
 static LPWSTR g_s4wPathTo7Zip = NULL;
 
+
 static UINT rFS_Run_7Zip ( const LPCWSTR wszIn, const LPCWSTR wszOut )
 {
-  const LPWSTR cmd = r4_alloca_s4w ( 2048*4 );
+  const LPWSTR cmd = r4_alloca_s4w ( kPathMax*4 );
   r4_push_array_s4w_sz ( cmd, L"\"", 2 );
   r4_push_array_s4w_sz ( cmd, g_s4wPathTo7Zip, r4_get_count_s4w(g_s4wPathTo7Zip)+1 );
   r4_push_array_s4w_sz ( cmd, L"\" x \"-o", 8 );
@@ -60,7 +61,7 @@ static UINT rFS_Run_7Zip ( const LPCWSTR wszIn, const LPCWSTR wszOut )
 
 static UINT rFS_Run_WordConv ( const LPCWSTR wszIn, const LPCWSTR wszOut )
 {
-  const LPWSTR cmd = r4_alloca_s4w ( 2048*4 );
+  const LPWSTR cmd = r4_alloca_s4w ( kPathMax*4 );
   r4_push_array_s4w_sz ( cmd, L"\"", 2 );
   r4_push_array_s4w_sz ( cmd, g_s4wPathToWordConv, r4_get_count_s4w(g_s4wPathToWordConv)+1 );
   r4_push_array_s4w_sz ( cmd, L"\" -oice -nme \"", 15 );
@@ -108,9 +109,17 @@ static UINT rFS_GetCurrentDirectory_s4w ( const LPWSTR s4w )
   Создать папку и добавить её к пути
   Возвращает предыдущее значение длины пути
 */
-static UINT rFS_AddDir ( const LPWSTR s4w, const LPCWSTR wsz )
+static UINT rFS_AddDir ( const LPWSTR s4w, const LPCWSTR wsz, const UINT k )
 {
-  const UINT n = r4_push_array_s4w_sz ( s4w, wsz, 0 );
+  const UINT n = r4_push_array_s4w_sz ( s4w, wsz, k );
+  if ( ! CreateDirectory ( s4w, NULL ) )
+  {
+    const UINT i = GetLastError();
+    if ( i != ERROR_ALREADY_EXISTS )
+    {
+      rLog_Error_WinAPI ( CreateDirectory, GetLastError(), L"%s\n", s4w );
+    }
+  }
   return n;
 }
 
@@ -128,35 +137,31 @@ static UINT rFS_Tree ( const LPWSTR s4wPath,
         const LPCWSTR wszFolderName ) )
 {
   WIN32_FIND_DATA ffd;
+  UINT iErr = 0;
+  const UINT n1 = r4_push_array_s4w_sz ( s4wPath, L"\\*", 3 );
+  const HANDLE hFind  = FindFirstFile ( s4wPath, &ffd );
+  if ( hFind == INVALID_HANDLE_VALUE )
   {
-    const UINT n1 = r4_push_array_s4w_sz ( s4wPath, L"\\*", 3 );
-    const HANDLE hFind  = FindFirstFile ( s4wPath, &ffd );
-    if ( hFind == INVALID_HANDLE_VALUE )
-    {
-      rLog_Error_WinAPI ( FindFirstFile, GetLastError(), s4wPath );
-      r4_cut_end_s4w ( s4wPath, n1 );
-      return __LINE__;
-    }
+    rLog_Error_WinAPI ( FindFirstFile, GetLastError(), s4wPath );
     r4_cut_end_s4w ( s4wPath, n1 );
-    do
-    {
-      if ( wcscmp ( ffd.cFileName, L"." ) == 0 ) continue;
-      if ( wcscmp ( ffd.cFileName, L".." ) == 0 ) continue;
-      const UINT n2 = r4_push_array_s4w_sz ( s4wPath, L"\\", 2 );
-      r4_push_array_s4w_sz ( s4wPath, ffd.cFileName, 0 );
-      if ( ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
-      {
-        if ( prFolderProc ) { prFolderProc ( s4wPath, ffd.cFileName ); }
-      }
-      else
-      {
-        if ( prFileProc ) { prFileProc ( s4wPath, ffd.cFileName, ffd.nFileSizeLow ); }
-      }
-      r4_cut_end_s4w ( s4wPath, n2 );
-    } while ( FindNextFile ( hFind, &ffd ) );
-    FindClose ( hFind );
+    return __LINE__;
   }
-  return 0;
+  r4_cut_end_s4w ( s4wPath, n1 );
+  do
+  {
+    if ( wcscmp ( ffd.cFileName, L"." ) == 0 ) continue;
+    if ( wcscmp ( ffd.cFileName, L".." ) == 0 ) continue;
+    const UINT n2 = r4_push_array_s4w_sz ( s4wPath, L"\\", 2 );
+    r4_push_array_s4w_sz ( s4wPath, ffd.cFileName, 0 );
+    if ( ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
+    { if ( prFolderProc ) { if ( ( iErr = prFolderProc ( s4wPath, ffd.cFileName ) ) ) goto P_Err; } }
+    else
+    { if ( prFileProc ) { if ( ( iErr = prFileProc ( s4wPath, ffd.cFileName, ffd.nFileSizeLow ) ) ) goto P_Err; } }
+    r4_cut_end_s4w ( s4wPath, n2 );
+  } while ( FindNextFile ( hFind, &ffd ) );
+  P_Err:
+  FindClose ( hFind );
+  return iErr;
 }
 
 
@@ -212,4 +217,28 @@ static UINT rFS_SearchExe ( )
     FindClose ( hFind );
   }
   return 0;
+}
+/*
+  Создаёт уникальную временную папку
+*/
+static UINT rFS_GetNewRandDir_s4w ( const LPWSTR s4w )
+{
+  static UINT32 x = 0xbe8476f2;
+  WCHAR wsz[12];
+  while ( TRUE )
+  {
+    x = (x * 1103515245U) + 12345U;
+    const UINT i = r4_push_array_s4w_sz ( s4w, wsz, swprintf ( wsz, 11, L"\\%08" TEXT(PRIx32), x ) + 1 );
+    if ( !CreateDirectory ( s4w, NULL ) )
+    {
+      const UINT i = GetLastError();
+      if ( i != ERROR_ALREADY_EXISTS ) { rLog_Error_WinAPI ( CreateDirectory, GetLastError(), L"%s\n", s4w ); return 0; }
+      else { continue; }
+    }
+    else { return i; }
+  }
+}
+
+static UINT rFS_DeleteTree ( const LPWSTR s4w )
+{
 }

@@ -452,6 +452,12 @@ static UINT r4_cut_end_s4w ( const LPWSTR s4, const UINT n )
     return h->count;
   }
 }
+static UINT r4_init_s4w ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
+{
+  r4_cut_end_s4w ( s4, 0 );
+  return r4_push_array_s4w_sz ( s4, wsz, n );
+}
+#define r4_init_s4w_s4w(_p_,_w_) r4_init_s4w(_p_,_w_,r4_get_count_s4w(_w_)+1)
 /*
   Поиск подстроки по шаблону, возвращает указатель на первое вхождение
   wszS                  -- Строка где идёт поиск
@@ -491,12 +497,70 @@ static LPCWSTR r4_search_template_wsz ( LPCWSTR wszS, LPCWSTR wszT, const BOOL b
   }
 }
 
+#define r4_icmp_s4w(_p_,_w_,_n_) ( _wcsnicmp_l ( _p_, _w_, _n_, L"C" ) == 0 )
+
+
+static UINT r4_push_path_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
+{
+  if ( n == 0 ) { n = wcslen ( wsz ) + 1; }
+  const UINT i = r4_get_count_s4w ( s4 );
+  if ( r4_icmp_s4w ( wsz, L"\\\\?\\UNC\\", 8 ) )
+  {
+    r4_push_array_s4w_sz ( s4, L"\\", 2 );
+    r4_push_array_s4w_sz ( s4, wsz+7, n-7 );
+  }
+  else
+  if ( r4_icmp_s4w ( wsz, L"\\\\?\\", 4 ) )
+  {
+    r4_push_array_s4w_sz ( s4, wsz+4, n-4 );
+  }
+  else
+  {
+    r4_push_array_s4w_sz ( s4, wsz, n );
+  }
+  return i;
+}
 
 static BOOL r4_path_ending_s4w ( const LPCWSTR s4w, LPCWSTR wsz, UINT n )
 {
   if ( n == 0 ) { n = wcslen ( wsz ); }
   if ( r4_get_count_s4w ( s4w ) < n ) return FALSE;
-  return ( _wcsnicmp_l ( s4w + r4_get_count_s4w ( s4w ) - n, wsz, n, L"C" ) == 0 );
+  return ( r4_icmp_s4w ( s4w + r4_get_count_s4w ( s4w ) - n, wsz, n ) );
+}
+
+
+static BOOL r4_path_ending_s4w_las ( const LPCWSTR s4w )
+{
+  const LPWSTR w = r4_alloca_init_ex_s4w ( L".las", 8 );
+  if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  r4_init_s4w ( w, L".las[1]", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  r4_init_s4w ( w, L".las[2]", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  return FALSE;
+}
+static BOOL r4_path_ending_s4w_doc ( const LPCWSTR s4w )
+{
+  const LPWSTR w = r4_alloca_init_ex_s4w ( L".doc", 5 );
+  if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  return FALSE;
+}
+static BOOL r4_path_ending_s4w_docx ( const LPCWSTR s4w )
+{
+  const LPWSTR w = r4_alloca_init_ex_s4w ( L".docx", 6 );
+  if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  return FALSE;
+}
+static BOOL r4_path_ending_s4w_zip ( const LPCWSTR s4w )
+{
+  const LPWSTR w = r4_alloca_init_ex_s4w ( L".zip", 5 );
+  if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  r4_init_s4w ( w, L".rar", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  r4_init_s4w ( w, L".7z" , 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  r4_init_s4w ( w, L".arj", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  r4_init_s4w ( w, L".lzh", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  r4_init_s4w ( w, L".uc2", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  r4_init_s4w ( w, L".cab", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  r4_init_s4w ( w, L".ace", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  return FALSE;
 }
 
 VOID r4_test_alloca_init ( )
