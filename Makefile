@@ -12,11 +12,13 @@ CPPFLAGS := \
 CFLAGS := \
   -Wall \
   -municode \
+  -mwindows \
   -g \
 
 LDFLAGS := \
   -Wall \
   -municode \
+  -mwindows \
   -g \
   -static \
 

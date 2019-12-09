@@ -43,6 +43,7 @@
           ^ [-2]        - количество элементов
           ^ [-1]        - 0x78abcdef
 */
+typedef double DOUBLE;
 
 /* Структура заголовков векторов */
 struct s4a_head
@@ -85,19 +86,37 @@ struct s4s_head
   #endif
 };
 
+
 // #define D4TriIf(_e_,_t_,_f_)            __mingw_choose_expr(_e_,_t_,_f_)
 // #define D4TypeOf(_p_,_t_)               __mingw_types_compatible_p(__typeof__(_p_),_t_)
 // #define D4TriType(_p_,_t_,_0_,_1_)      D4TriIf(D4TypeOf(_p_,_t_*),_1_,D4TriIf(D4TypeOf(_p_,_t_[]),_1_,_0_))
 // #define D4TriIf(_e_,_t_,_f_)            __mingw_choose_expr(_e_,_t_,_f_)
 // #define D4TypeOf(_p_,_t_)               __mingw_types_compatible_p(__typeof__(_p_),_t_)
-#define D4TriType(_p_,_t_,_0_,_1_)      _Generic(_p_,_t_*:_1_,default:_0_)
 #define D4PrintWarnOfType()             fprintf(stderr,"Warning of types in %s : %d\n",__FILE__,__LINE__),fflush(stderr)
+#define D4TriType(_p_,_t_,_f_)          _Generic(_p_,_t_*:_f_,default:(D4PrintWarnOfType(),_f_))
+#define D4Uni(_p_,_f_,...)              _Generic(_p_,\
+    CHAR  *:_f_##_s4a  (__VA_ARGS__),\
+    WCHAR *:_f_##_s4w  (__VA_ARGS__),\
+    FLOAT *:_f_##_s4f  (__VA_ARGS__),\
+    DOUBLE*:_f_##_s4d  (__VA_ARGS__),\
+    INT   *:_f_##_s4i  (__VA_ARGS__),\
+    UINT  *:_f_##_s4u  (__VA_ARGS__),\
+    INT8  *:_f_##_s4i8 (__VA_ARGS__),\
+    UINT8 *:_f_##_s4u8 (__VA_ARGS__),\
+    INT16 *:_f_##_s4i16(__VA_ARGS__),\
+    INT64 *:_f_##_s4i64(__VA_ARGS__),\
+    UINT64*:_f_##_s4u64(__VA_ARGS__),\
+    LPSTR *:_f_##_ss4a (__VA_ARGS__),\
+    LPWSTR*:_f_##_ss4w (__VA_ARGS__),\
+    LPBYTE*:_f_##_ss4z (__VA_ARGS__),\
+    LPVOID*:_f_##_s4p  (__VA_ARGS__),\
+    default:(NULL))
 
 /*
   Получает указатель на начало блока памяти вектора
 */
 #define D4GetPtrHead__0(_p_,_h_,_b_)    ((_h_*)(((LPVOID)(_p_))-sizeof(_h_)))
-#define D4GetPtrHead__(_p_,_h_,_b_)     D4TriType(_p_,_b_,(D4PrintWarnOfType(),D4GetPtrHead__0(_p_,_h_,_b_)),D4GetPtrHead__0(_p_,_h_,_b_))
+#define D4GetPtrHead__(_p_,_h_,_b_)     D4TriType(_p_,_b_,D4GetPtrHead__0(_p_,_h_,_b_))
 #define D4GetPtrHead_s4a(_p_)           D4GetPtrHead__(_p_,struct s4a_head,CHAR  )
 #define D4GetPtrHead_s4w(_p_)           D4GetPtrHead__(_p_,struct s4w_head,WCHAR )
 #define D4GetPtrHead_s4z(_p_)           D4GetPtrHead__(_p_,struct s4z_head,CHAR  )
@@ -118,6 +137,8 @@ struct s4s_head
 #define D4GetPtrHead_ss4z(_p_)          D4GetPtrHead__(_p_,struct s4p_head,LPSTR )
 #define D4GetPtrHead_s4p(_p_)           D4GetPtrHead__(_p_,struct s4p_head,LPVOID)
 #define D4GetPtrHead_s4s(_p_,_b_)       D4GetPtrHead__(_p_,struct s4s_head,_b_   )
+#define D4GetPtrHead_Uni(_p_)           D4Uni(_p_,D4GetPtrHead,_p_)
+
 /*
   Получает указатель на начало блока данных вектора
 */
@@ -169,7 +190,8 @@ struct s4s_head
 /*
   Выделение места на стеке с инициализацией
 */
-#define r4_alloca_init__(_s_,_h_,_b_,_n_)  memcpy(r4_alloca__(_h_,_b_,sizeof(_s_)/sizeof(*_s_),(sizeof(_s_)/sizeof(*_s_))-_n_),_s_,sizeof(_s_))
+#define r4_alloca_init__0(_s_,_h_,_b_,_n_)  memcpy(r4_alloca__(_h_,_b_,sizeof(_s_)/sizeof(*_s_),(sizeof(_s_)/sizeof(*_s_))-_n_),_s_,sizeof(_s_))
+#define r4_alloca_init__(_s_,_h_,_b_,_n_)   D4TriType(_s_,_b_,r4_alloca_init__0(_s_,_h_,_b_,_n_))
 #define r4_alloca_init_s4a(_s_)         r4_alloca_init__(_s_,struct s4a_head,CHAR  ,1)
 #define r4_alloca_init_s4w(_s_)         r4_alloca_init__(_s_,struct s4w_head,WCHAR ,1)
 #define r4_alloca_init_s4z(_s_)         r4_alloca_init__(_s_,struct s4z_head,CHAR  ,1)
@@ -190,6 +212,7 @@ struct s4s_head
 #define r4_alloca_init_ss4z(_a_)        r4_alloca_init__(_a_,struct s4p_head,LPSTR ,0)
 #define r4_alloca_init_s4p(_a_)         r4_alloca_init__(_a_,struct s4p_head,LPVOID,0)
 #define r4_alloca_init_s4s(_a_,_b_)     r4_alloca_init__(_a_,struct s4p_head,_b_,0)
+#define r4_alloca_init_Uni(_p_)         D4Uni(_p_,r4_alloca_init,_p_)
 /*
   Получение количества элементов (исключая нулевой элемент для строк)
 */
@@ -214,6 +237,7 @@ struct s4s_head
 #define r4_get_count_ss4z(_p_)          r4_get_count__(ss4z ,_p_)
 #define r4_get_count_s4p(_p_)           r4_get_count__(s4p  ,_p_)
 #define r4_get_count_s4s(_p_)           r4_get_count__(s4s  ,_p_)
+#define r4_get_count_Uni(_p_)           D4Uni(_p_,r4_get_count,_p_)
 /*
   Получение количества элементов вмещаемое в массив
 */
@@ -238,8 +262,12 @@ struct s4s_head
 #define r4_get_memsz_ss4z(_p_)          r4_get_memsz__(ss4z ,_p_)
 #define r4_get_memsz_s4p(_p_)           r4_get_memsz__(s4p  ,_p_)
 #define r4_get_memsz_s4s(_p_)           r4_get_memsz__(s4s  ,_p_)
+#define r4_get_memsz_Uni(_p_)           D4Uni(_p_,r4_get_memsz,_p_)
 /*
   Цикл по всем элементам массива
+  _p_ -- вектор
+  _i_ -- название переменной счётчика
+  _n_ -- название переменной длины вектора
 */
 #define D4ForAll__(_,_p_,_i_,_n_)       const UINT _n_=r4_get_count__(_,_p_);for(UINT _i_=0;_i_<_n_;++_i_)
 #define D4ForAll_s4a(_p_,_i_,_n_)       D4ForAll__(s4a  ,_p_,_i_,_n_)
@@ -262,6 +290,7 @@ struct s4s_head
 #define D4ForAll_ss4z(_p_,_i_,_n_)      D4ForAll__(ss4z ,_p_,_i_,_n_)
 #define D4ForAll_s4p(_p_,_i_,_n_)       D4ForAll__(s4p  ,_p_,_i_,_n_)
 #define D4ForAll_s4s(_p_,_i_,_n_)       D4ForAll__(s4s  ,_p_,_i_,_n_)
+#define D4ForAll_Uni(_p_,_i_,_n_)       D4Uni(_p_,D4ForAll,_p_,_i_,_n_)
 
 
 VOID r4_test_alloca_init ( )
@@ -310,6 +339,8 @@ VOID r4_test_alloca_init ( )
     fprintf ( pf, "%p|", p5[i] );
   } fprintf ( pf, "\n" );
   fprintf ( pf, "-   9     9     %p|%p|%p|%p|%p|%p|%p|%p|%p|\n", p1, p2, p3, p4, &p1, &p2, &p3, &p4, &p5 );
+
+
 
 
   fclose ( pf );
