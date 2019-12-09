@@ -474,7 +474,7 @@ static LPCWSTR r4_search_template_wsz ( LPCWSTR wszS, LPCWSTR wszT, const BOOL b
         const LPCWSTR wsz = r4_search_template_wsz ( wszS, wszT+1, bCase );
         if ( wsz ) { return wsz; }
         else { ++wszS; goto P_Begin; }
-      } else return wszS;
+      } else return NULL;
     case '\0':
       return wszS;
     default:
