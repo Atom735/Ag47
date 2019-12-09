@@ -452,6 +452,44 @@ static UINT r4_cut_end_s4w ( const LPWSTR s4, const UINT n )
     return h->count;
   }
 }
+/*
+  Поиск подстроки по шаблону, возвращает указатель на первое вхождение
+  wszS                  -- Строка где идёт поиск
+  wszT                  -- Строка шаблона
+  bCase                 -- Флаг чувствительности к регистру
+                        * - произвольное количество любых символов
+                        ? - один произвольный символ
+*/
+static LPCWSTR r4_search_template_wsz ( LPCWSTR wszS, LPCWSTR wszT, const BOOL bCase )
+{
+  P_Begin:
+  switch ( *wszT )
+  {
+    case '?':
+      if ( *wszS ) { ++wszS; ++wszT; goto P_Begin; }
+      else return NULL;
+    case '*':
+      if ( *wszS )
+      {
+        const LPCWSTR wsz = r4_search_template_wsz ( wszS, wszT+1, bCase );
+        if ( wsz ) { return wsz; }
+        else { ++wszS; goto P_Begin; }
+      } else return wszS;
+    case '\0':
+      return wszS;
+    default:
+      if ( bCase )
+      {
+        if ( *wszS == *wszT ) { ++wszS; ++wszT; goto P_Begin; }
+        else return NULL;
+      }
+      else
+      {
+        if ( towupper ( *wszS ) == towupper ( *wszT ) ) { ++wszS; ++wszT; goto P_Begin; }
+        else return NULL;
+      }
+  }
+}
 
 
 VOID r4_test_alloca_init ( )

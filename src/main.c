@@ -35,12 +35,32 @@
 //   return 0;
 // }
 
+UINT rFileProc ( const LPCWSTR s4wFilePath, const LPCWSTR wszFileName,
+        const UINT nFileSize )
+{
+  rLog ( L"\t\t==>% 14u ==> %s\n", nFileSize, s4wFilePath );
+  return 0;
+}
+
 
 INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, INT nShowCmd )
 {
+  const LPCWSTR p = L"Hello world!"; LPCWSTR p2;
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"*l*", TRUE ) );
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"*l*", FALSE ) );
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"*L*", TRUE ) );
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"*L*", FALSE ) );
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"*HELLO*", TRUE ) );
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"*HELLO*", FALSE ) );
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"*world?", TRUE ) );
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"*world?", FALSE ) );
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"H??LO", TRUE ) );
+  rLog ( L"%s(%s)==>%s\n", p, p2, r4_search_template_wsz ( p, p2 = L"H??LO", FALSE ) );
+
   AllocConsole ( );
-  const LPWSTR s4w = r4_alloca_init_ex_s4w ( L"\\\\NAS\\Public", 2048 );
-  rFS_Tree ( s4w, TRUE, TRUE, NULL );
+  const LPWSTR s4w = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public", 2048 );
+  rFS_Tree ( s4w, TRUE, rFileProc );
+
   rLog ( NULL );
   return 0;
 }

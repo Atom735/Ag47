@@ -7,7 +7,8 @@
   prFileProc            => Функция обработки найденных файлов
 */
 static UINT rFS_Tree ( const LPWSTR s4wFilePath, const BOOL bRecursive,
-        BOOL bArchives, UINT (*prFileProc)() )
+        UINT (*prFileProc)( const LPCWSTR s4wFilePath, const LPCWSTR wszFileName,
+        const UINT nFileSize ) )
 {
   WIN32_FIND_DATA ffd;
   {
@@ -22,9 +23,18 @@ static UINT rFS_Tree ( const LPWSTR s4wFilePath, const BOOL bRecursive,
     r4_cut_end_s4w ( s4wFilePath, n1 );
     do
     {
+      if ( wcscmp ( ffd.cFileName, L"." ) == 0 ) continue;
+      if ( wcscmp ( ffd.cFileName, L".." ) == 0 ) continue;
       const UINT n2 = r4_push_array_s4w_sz ( s4wFilePath, L"\\", 2 );
       r4_push_array_s4w_sz ( s4wFilePath, ffd.cFileName, 0 );
-      rLog ( L"\t\t==> %s\n", s4wFilePath );
+      if ( ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
+      {
+        if ( bRecursive ) { rFS_Tree ( s4wFilePath, bRecursive, prFileProc ); }
+      }
+      else
+      {
+        if ( prFileProc ) { prFileProc ( s4wFilePath, ffd.cFileName, ffd.nFileSizeLow ); }
+      }
       r4_cut_end_s4w ( s4wFilePath, n2 );
     } while ( FindNextFile ( hFind, &ffd ) );
     FindClose ( hFind );
