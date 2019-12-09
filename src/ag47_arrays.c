@@ -497,7 +497,7 @@ static LPCWSTR r4_search_template_wsz ( LPCWSTR wszS, LPCWSTR wszT, const BOOL b
   }
 }
 
-#define r4_icmp_s4w(_p_,_w_,_n_) ( _wcsnicmp_l ( _p_, _w_, _n_, L"C" ) == 0 )
+#define r4_icmp_s4w(_p_,_w_,_n_) ( _wcsnicmp_l ( _p_, _w_, _n_, g_locale_C ) == 0 )
 
 
 static UINT r4_push_path_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
@@ -520,8 +520,9 @@ static UINT r4_push_path_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
   }
   return i;
 }
+#define r4_push_path_s4w_s4w(_p_,_w_) r4_push_path_s4w_sz(_p_,_w_,r4_get_count_s4w(_w_)+1)
 
-static BOOL r4_path_ending_s4w ( const LPCWSTR s4w, LPCWSTR wsz, UINT n )
+static BOOL r4_path_ending_s4w ( const LPWSTR s4w, LPCWSTR wsz, UINT n )
 {
   if ( n == 0 ) { n = wcslen ( wsz ); }
   if ( r4_get_count_s4w ( s4w ) < n ) return FALSE;
@@ -555,11 +556,6 @@ static BOOL r4_path_ending_s4w_zip ( const LPCWSTR s4w )
   if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
   r4_init_s4w ( w, L".rar", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
   r4_init_s4w ( w, L".7z" , 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
-  r4_init_s4w ( w, L".arj", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
-  r4_init_s4w ( w, L".lzh", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
-  r4_init_s4w ( w, L".uc2", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
-  r4_init_s4w ( w, L".cab", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
-  r4_init_s4w ( w, L".ace", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
   return FALSE;
 }
 

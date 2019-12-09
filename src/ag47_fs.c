@@ -34,6 +34,20 @@ static UINT rFS_Run_7Zip ( const LPCWSTR wszIn, const LPCWSTR wszOut )
 {
   const LPWSTR cmd = r4_alloca_s4w ( kPathMax*4 );
   r4_push_array_s4w_sz ( cmd, L"\"", 2 );
+  r4_push_path_s4w_s4w ( cmd, g_s4wPathTo7Zip );
+  r4_push_array_s4w_sz ( cmd, L"\" x \"-o", 8 );
+  r4_push_path_s4w_s4w ( cmd, wszOut );
+  r4_push_array_s4w_sz ( cmd, L"\" \"", 4 );
+  r4_push_path_s4w_s4w ( cmd, wszIn );
+  r4_push_array_s4w_sz ( cmd, L"\" > \"", 6 );
+  r4_push_path_s4w_s4w ( cmd, s4wPathOutLogs_7Zip );
+  r4_push_array_s4w_sz ( cmd, L"\"", 2 );
+  return rFS_Run_Wait ( cmd );
+
+
+
+
+
   r4_push_array_s4w_sz ( cmd, g_s4wPathTo7Zip, r4_get_count_s4w(g_s4wPathTo7Zip)+1 );
   r4_push_array_s4w_sz ( cmd, L"\" x \"-o", 8 );
   if ( wcsncmp ( wszOut, L"\\\\?\\UNC\\", 8 ) == 0 )
@@ -55,7 +69,7 @@ static UINT rFS_Run_7Zip ( const LPCWSTR wszIn, const LPCWSTR wszOut )
   {
     r4_push_array_s4w_sz ( cmd, wszIn, 0 );
   }
-  r4_push_array_s4w_sz ( cmd, L"\"", 2 );
+  r4_push_array_s4w_sz ( cmd, L"\" > \"", 6 );
   return rFS_Run_Wait ( cmd );
 }
 
@@ -221,7 +235,7 @@ static UINT rFS_SearchExe ( )
 /*
   Создаёт уникальную временную папку
 */
-static UINT rFS_GetNewRandDir_s4w ( const LPWSTR s4w )
+static UINT rFS_NewRandDir_s4w ( const LPWSTR s4w )
 {
   static UINT32 x = 0xbe8476f2;
   WCHAR wsz[12];
@@ -239,6 +253,41 @@ static UINT rFS_GetNewRandDir_s4w ( const LPWSTR s4w )
   }
 }
 
+UINT rFS_DeleteTree_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
+        const UINT nFileSize );
+UINT rFS_DeleteTree_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName );
+
+UINT rFS_DeleteTree_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
+        const UINT nFileSize )
+{
+  if ( !DeleteFile ( s4wPath ) )
+  {
+    rLog_Error_WinAPI ( DeleteFile, GetLastError(), L"%s\n", s4wPath );
+    return __LINE__;
+  }
+  return 0;
+}
+
+UINT rFS_DeleteTree_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName )
+{
+  const UINT iErr = rFS_Tree ( s4wPath, rFS_DeleteTree_FileProc, rFS_DeleteTree_FolderProc );
+  if ( iErr ) return iErr;
+  if ( !RemoveDirectory ( s4wPath ) )
+  {
+    rLog_Error_WinAPI ( RemoveDirectory, GetLastError(), L"%s\n", s4wPath );
+    return __LINE__;
+  }
+  return 0;
+}
+
 static UINT rFS_DeleteTree ( const LPWSTR s4w )
 {
+  const UINT iErr = rFS_Tree ( s4w, rFS_DeleteTree_FileProc, rFS_DeleteTree_FolderProc );
+  if ( iErr ) return iErr;
+  if ( !RemoveDirectory ( s4w ) )
+  {
+    rLog_Error_WinAPI ( RemoveDirectory, GetLastError(), L"%s\n", s4w );
+    return __LINE__;
+  }
+  return 0;
 }
