@@ -1,4 +1,98 @@
-﻿/*
+﻿static UINT rFS_Run ( const LPWSTR cmd, LPPROCESS_INFORMATION pi )
+{
+  STARTUPINFO s =
+  {
+    .cb = sizeof(STARTUPINFO),
+    .dwFlags = STARTF_USESTDHANDLES,
+    .hStdInput = GetStdHandle ( STD_INPUT_HANDLE ),
+    .hStdOutput = GetStdHandle ( STD_OUTPUT_HANDLE ),
+    .hStdError = GetStdHandle ( STD_ERROR_HANDLE ),
+  };
+  return CreateProcess ( NULL, cmd, NULL , NULL, TRUE,
+          CREATE_UNICODE_ENVIRONMENT | NORMAL_PRIORITY_CLASS,
+          NULL, NULL, &s, pi );
+}
+
+static UINT rFS_Run_Wait ( const LPWSTR cmd )
+{
+  PROCESS_INFORMATION pi;
+  const UINT i = rFS_Run ( cmd, &pi );
+  // Wait until child process exits.
+  WaitForSingleObject( pi.hProcess, INFINITE );
+  // Close process and thread handles.
+  CloseHandle( pi.hProcess );
+  CloseHandle( pi.hThread );
+  return i;
+}
+
+
+
+static UINT rFS_Run_7Zip ( const LPCWSTR wszIn, const LPCWSTR wszOut )
+{
+  const LPWSTR cmd = r4_alloca_s4w ( 2048*4 );
+  r4_push_array_s4w_sz ( cmd, L"\"", 2 );
+  r4_push_array_s4w_sz ( cmd, g_s4wPathTo7Zip, r4_get_count_s4w(g_s4wPathTo7Zip)+1 );
+  r4_push_array_s4w_sz ( cmd, L"\" x \"-o", 8 );
+  if ( wcsncmp ( wszOut, L"\\\\?\\UNC\\", 8 ) == 0 )
+  {
+    r4_push_array_s4w_sz ( cmd, L"\\", 2 );
+    r4_push_array_s4w_sz ( cmd, wszOut+7, 0 );
+  }
+  else
+  {
+    r4_push_array_s4w_sz ( cmd, wszOut, 0 );
+  }
+  r4_push_array_s4w_sz ( cmd, L"\" \"", 4 );
+  if ( wcsncmp ( wszIn, L"\\\\?\\UNC\\", 8 ) == 0 )
+  {
+    r4_push_array_s4w_sz ( cmd, L"\\", 2 );
+    r4_push_array_s4w_sz ( cmd, wszIn+7, 0 );
+  }
+  else
+  {
+    r4_push_array_s4w_sz ( cmd, wszIn, 0 );
+  }
+  r4_push_array_s4w_sz ( cmd, L"\"", 2 );
+  return rFS_Run_Wait ( cmd );
+}
+
+static UINT rFS_Run_WordConv ( const LPCWSTR wszIn, const LPCWSTR wszOut )
+{
+  const LPWSTR cmd = r4_alloca_s4w ( 2048*4 );
+  r4_push_array_s4w_sz ( cmd, L"\"", 2 );
+  r4_push_array_s4w_sz ( cmd, g_s4wPathToWordConv, r4_get_count_s4w(g_s4wPathToWordConv)+1 );
+  r4_push_array_s4w_sz ( cmd, L"\" -oice -nme \"", 15 );
+  if ( wcsncmp ( wszIn, L"\\\\?\\UNC\\", 8 ) == 0 )
+  {
+    r4_push_array_s4w_sz ( cmd, L"\\", 2 );
+    r4_push_array_s4w_sz ( cmd, wszIn+7, 0 );
+  }
+  else
+  {
+    r4_push_array_s4w_sz ( cmd, wszIn, 0 );
+  }
+  r4_push_array_s4w_sz ( cmd, L"\" \"", 4 );
+
+  if ( wcsncmp ( wszOut, L"\\\\?\\UNC\\", 8 ) == 0 )
+  {
+    r4_push_array_s4w_sz ( cmd, L"\\", 2 );
+    r4_push_array_s4w_sz ( cmd, wszOut+7, 0 );
+  }
+  else
+  {
+    r4_push_array_s4w_sz ( cmd, wszOut, 0 );
+  }
+  r4_push_array_s4w_sz ( cmd, L"\"", 2 );
+  return rFS_Run_Wait ( cmd );
+}
+
+// g_s4wPathToWordConv
+// g_s4wPathTo7Zip
+
+
+
+
+/*
   Поиск файлов в папке
   s4wPath               => путь к дериктории где производится поиск,
                         в конце будет приписано окончание \* для поиска всех файлов
@@ -7,8 +101,8 @@
   prFolderProc          => Функция обработки найденных папок
 */
 static UINT rFS_Tree ( const LPWSTR s4wPath,
-        UINT (*prFileProc)( const LPCSTR s4wPath, const LPCWSTR wszFileName,
-        const UINT nFileSize ), UINT (*prFolderProc)( const LPCSTR s4wPath,
+        UINT (*prFileProc)( const LPWSTR s4wPath, const LPCWSTR wszFileName,
+        const UINT nFileSize ), UINT (*prFolderProc)( const LPWSTR s4wPath,
         const LPCWSTR wszFolderName ) )
 {
   WIN32_FIND_DATA ffd;
