@@ -69,7 +69,8 @@ struct s4p_head
 };
 struct s4s_vtbl
 {
-  /* Функция освобождения данных структуры, где первым аргументом идёт указатель на элемент, а вторым на доп данные
+  /*
+    Функция освобождения данных структуры, где первым аргументом идёт указатель на элемент, а вторым на доп данные
   */
   void ( *func_free )( LPVOID p, LPVOID ptr );
   LPVOID                ptr;
@@ -95,25 +96,25 @@ struct s4s_head
 #define D4PrintWarnOfType()             fprintf(stderr,"Warning of types in %s : %d\n",__FILE__,__LINE__),fflush(stderr)
 #define D4TriType(_p_,_t_,_f_)          _Generic(_p_,_t_*:_f_,default:(D4PrintWarnOfType(),_f_))
 #define D4Uni(_p_,_f_,...)              _Generic(_p_,\
-    CHAR  *:_f_##_s4a  (__VA_ARGS__),\
-    WCHAR *:_f_##_s4w  (__VA_ARGS__),\
-    FLOAT *:_f_##_s4f  (__VA_ARGS__),\
-    DOUBLE*:_f_##_s4d  (__VA_ARGS__),\
-    INT   *:_f_##_s4i  (__VA_ARGS__),\
-    UINT  *:_f_##_s4u  (__VA_ARGS__),\
-    INT8  *:_f_##_s4i8 (__VA_ARGS__),\
-    UINT8 *:_f_##_s4u8 (__VA_ARGS__),\
-    INT16 *:_f_##_s4i16(__VA_ARGS__),\
-    INT64 *:_f_##_s4i64(__VA_ARGS__),\
-    UINT64*:_f_##_s4u64(__VA_ARGS__),\
-    LPSTR *:_f_##_ss4a (__VA_ARGS__),\
-    LPWSTR*:_f_##_ss4w (__VA_ARGS__),\
-    LPBYTE*:_f_##_ss4z (__VA_ARGS__),\
-    LPVOID*:_f_##_s4p  (__VA_ARGS__),\
-    default:(NULL))
+    CHAR  *:_f_##_s4a  ,\
+    WCHAR *:_f_##_s4w  ,\
+    FLOAT *:_f_##_s4f  ,\
+    DOUBLE*:_f_##_s4d  ,\
+    INT   *:_f_##_s4i  ,\
+    UINT  *:_f_##_s4u  ,\
+    INT8  *:_f_##_s4i8 ,\
+    UINT8 *:_f_##_s4u8 ,\
+    INT16 *:_f_##_s4i16,\
+    INT64 *:_f_##_s4i64,\
+    UINT64*:_f_##_s4u64,\
+    LPSTR *:_f_##_ss4a ,\
+    LPWSTR*:_f_##_ss4w ,\
+    LPVOID*:_f_##_s4p  ,\
+    default:WTF)(__VA_ARGS__)
 
 /*
   Получает указатель на начало блока памяти вектора
+  _p_ -- Вектор
 */
 #define D4GetPtrHead__0(_p_,_h_,_b_)    ((_h_*)(((LPVOID)(_p_))-sizeof(_h_)))
 #define D4GetPtrHead__(_p_,_h_,_b_)     D4TriType(_p_,_b_,D4GetPtrHead__0(_p_,_h_,_b_))
@@ -141,6 +142,7 @@ struct s4s_head
 
 /*
   Получает указатель на начало блока данных вектора
+  _p_ -- Голова аектора
 */
 #define D4GetPtrBody__(_p_,_h_,_b_)     ((_b_*)(((LPVOID)(_p_))+sizeof(_h_)))
 #define D4GetPtrBody_s4a(_p_)           D4GetPtrBody__(_p_,struct s4a_head,CHAR  )
@@ -165,6 +167,7 @@ struct s4s_head
 #define D4GetPtrBody_s4s(_p_,_b_)       D4GetPtrBody__(_p_,struct s4s_head,_b_   )
 /*
   Выделение места на стеке
+  _n_ -- Количество элементов
 */
 #define r4_alloca__(_h_,_b_,_n_,_c_)    D4GetPtrBody__(memcpy(alloca(sizeof(_h_)+(sizeof(_b_)*_n_)),&((_h_){.memsz=_n_,.count=_c_}),sizeof(_h_)),_h_,_b_)
 #define r4_alloca_s4a(_n_)              r4_alloca__(struct s4a_head,CHAR  ,_n_,0)
@@ -189,6 +192,8 @@ struct s4s_head
 #define r4_alloca_s4s(_n_,_b_)          D4GetPtrBody_s4s(memcpy(alloca(sizeof(struct s4s_head)+(sizeof(_b_)*_n_)),&((struct s4s_head){.memsz=_n_,.count=0,.elemsz=sizeof(_b_)}),sizeof(struct s4s_head)),_b_)
 /*
   Выделение места на стеке с инициализацией
+  _s_ -- Строка
+  _a_ -- Массив
 */
 #define r4_alloca_init__0(_s_,_h_,_b_,_n_)  memcpy(r4_alloca__(_h_,_b_,sizeof(_s_)/sizeof(*_s_),(sizeof(_s_)/sizeof(*_s_))-_n_),_s_,sizeof(_s_))
 #define r4_alloca_init__(_s_,_h_,_b_,_n_)   D4TriType(_s_,_b_,r4_alloca_init__0(_s_,_h_,_b_,_n_))
@@ -211,10 +216,120 @@ struct s4s_head
 #define r4_alloca_init_ss4w(_a_)        r4_alloca_init__(_a_,struct s4p_head,LPWSTR,0)
 #define r4_alloca_init_ss4z(_a_)        r4_alloca_init__(_a_,struct s4p_head,LPSTR ,0)
 #define r4_alloca_init_s4p(_a_)         r4_alloca_init__(_a_,struct s4p_head,LPVOID,0)
-#define r4_alloca_init_s4s(_a_,_b_)     r4_alloca_init__(_a_,struct s4p_head,_b_,0)
+#define r4_alloca_init_s4s(_a_,_b_)     r4_alloca_init__(_a_,struct s4p_head,_b_   ,0)
 #define r4_alloca_init_Uni(_p_)         D4Uni(_p_,r4_alloca_init,_p_)
 /*
+  Выделение места на стеке c указаным количеством элементов
+  _s_ -- Строка
+  _a_ -- Массив
+  _n_ -- Количество \лементов
+*/
+#define r4_alloca_init_ex__0(_s_,_N_,_h_,_b_,_n_)   memcpy(r4_alloca__(_h_,_b_,_N_,(sizeof(_s_)/sizeof(*_s_))-_n_),_s_,sizeof(_s_))
+#define r4_alloca_init_ex__(_s_,_N_,_h_,_b_,_n_)    D4TriType(_s_,_b_,r4_alloca_init_ex__0(_s_,_N_,_h_,_b_,_n_))
+#define r4_alloca_init_ex_s4a(_s_,_n_)          r4_alloca_init_ex__(_s_,_n_,struct s4a_head,CHAR  ,1)
+#define r4_alloca_init_ex_s4w(_s_,_n_)          r4_alloca_init_ex__(_s_,_n_,struct s4w_head,WCHAR ,1)
+#define r4_alloca_init_ex_s4z(_s_,_n_)          r4_alloca_init_ex__(_s_,_n_,struct s4z_head,CHAR  ,1)
+#define r4_alloca_init_ex_s4f(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,FLOAT ,0)
+#define r4_alloca_init_ex_s4d(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,DOUBLE,0)
+#define r4_alloca_init_ex_s4i(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,INT   ,0)
+#define r4_alloca_init_ex_s4u(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,UINT  ,0)
+#define r4_alloca_init_ex_s4i8(_a_,_n_)         r4_alloca_init_ex__(_a_,_n_,struct s4p_head,INT8  ,0)
+#define r4_alloca_init_ex_s4u8(_a_,_n_)         r4_alloca_init_ex__(_a_,_n_,struct s4p_head,UINT8 ,0)
+#define r4_alloca_init_ex_s4i16(_a_,_n_)        r4_alloca_init_ex__(_a_,_n_,struct s4p_head,INT16 ,0)
+#define r4_alloca_init_ex_s4u16(_a_,_n_)        r4_alloca_init_ex__(_a_,_n_,struct s4p_head,UINT16,0)
+#define r4_alloca_init_ex_s4i32(_a_,_n_)        r4_alloca_init_ex__(_a_,_n_,struct s4p_head,INT32 ,0)
+#define r4_alloca_init_ex_s4u32(_a_,_n_)        r4_alloca_init_ex__(_a_,_n_,struct s4p_head,UINT32,0)
+#define r4_alloca_init_ex_s4i64(_a_,_n_)        r4_alloca_init_ex__(_a_,_n_,struct s4p_head,INT64 ,0)
+#define r4_alloca_init_ex_s4u64(_a_,_n_)        r4_alloca_init_ex__(_a_,_n_,struct s4p_head,UINT64,0)
+#define r4_alloca_init_ex_ss4a(_a_,_n_)         r4_alloca_init_ex__(_a_,_n_,struct s4p_head,LPSTR ,0)
+#define r4_alloca_init_ex_ss4w(_a_,_n_)         r4_alloca_init_ex__(_a_,_n_,struct s4p_head,LPWSTR,0)
+#define r4_alloca_init_ex_ss4z(_a_,_n_)         r4_alloca_init_ex__(_a_,_n_,struct s4p_head,LPSTR ,0)
+#define r4_alloca_init_ex_s4p(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,LPVOID,0)
+#define r4_alloca_init_ex_s4s(_a_,_n_,_b_)      r4_alloca_init_ex__(_a_,_n_,struct s4p_head,_b_   ,0)
+#define r4_alloca_init_ex_Uni(_p_,_n_)          D4Uni(_p_,r4_alloca_init_ex,_p_,_n_)
+/*
+  Выделение места на стеке
+  _n_ -- Количество элементов
+*/
+#define r4_malloc__(_h_,_b_,_n_,_c_)    D4GetPtrBody__(memcpy(malloc(sizeof(_h_)+(sizeof(_b_)*_n_)),&((_h_){.memsz=_n_,.count=_c_}),sizeof(_h_)),_h_,_b_)
+#define r4_malloc_s4a(_n_)              r4_malloc__(struct s4a_head,CHAR  ,_n_,0)
+#define r4_malloc_s4w(_n_)              r4_malloc__(struct s4w_head,WCHAR ,_n_,0)
+#define r4_malloc_s4z(_n_)              r4_malloc__(struct s4z_head,CHAR  ,_n_,0)
+#define r4_malloc_s4f(_n_)              r4_malloc__(struct s4p_head,FLOAT ,_n_,0)
+#define r4_malloc_s4d(_n_)              r4_malloc__(struct s4p_head,DOUBLE,_n_,0)
+#define r4_malloc_s4i(_n_)              r4_malloc__(struct s4p_head,INT   ,_n_,0)
+#define r4_malloc_s4u(_n_)              r4_malloc__(struct s4p_head,UINT  ,_n_,0)
+#define r4_malloc_s4i8(_n_)             r4_malloc__(struct s4p_head,INT8  ,_n_,0)
+#define r4_malloc_s4u8(_n_)             r4_malloc__(struct s4p_head,UINT8 ,_n_,0)
+#define r4_malloc_s4i16(_n_)            r4_malloc__(struct s4p_head,INT16 ,_n_,0)
+#define r4_malloc_s4u16(_n_)            r4_malloc__(struct s4p_head,UINT16,_n_,0)
+#define r4_malloc_s4i32(_n_)            r4_malloc__(struct s4p_head,INT32 ,_n_,0)
+#define r4_malloc_s4u32(_n_)            r4_malloc__(struct s4p_head,UINT32,_n_,0)
+#define r4_malloc_s4i64(_n_)            r4_malloc__(struct s4p_head,INT64 ,_n_,0)
+#define r4_malloc_s4u64(_n_)            r4_malloc__(struct s4p_head,UINT64,_n_,0)
+#define r4_malloc_ss4a(_n_)             r4_malloc__(struct s4p_head,LPSTR ,_n_,0)
+#define r4_malloc_ss4w(_n_)             r4_malloc__(struct s4p_head,LPWSTR,_n_,0)
+#define r4_malloc_ss4z(_n_)             r4_malloc__(struct s4p_head,LPSTR ,_n_,0)
+#define r4_malloc_s4p(_n_)              r4_malloc__(struct s4p_head,LPVOID,_n_,0)
+#define r4_malloc_s4s(_n_,_b_)          D4GetPtrBody_s4s(memcpy(malloc(sizeof(struct s4s_head)+(sizeof(_b_)*_n_)),&((struct s4s_head){.memsz=_n_,.count=0,.elemsz=sizeof(_b_)}),sizeof(struct s4s_head)),_b_)
+/*
+  Выделение места на стеке с инициализацией
+  _s_ -- Строка
+  _a_ -- Массив
+*/
+#define r4_malloc_init__0(_s_,_h_,_b_,_n_)  memcpy(r4_malloc__(_h_,_b_,sizeof(_s_)/sizeof(*_s_),(sizeof(_s_)/sizeof(*_s_))-_n_),_s_,sizeof(_s_))
+#define r4_malloc_init__(_s_,_h_,_b_,_n_)   D4TriType(_s_,_b_,r4_malloc_init__0(_s_,_h_,_b_,_n_))
+#define r4_malloc_init_s4a(_s_)         r4_malloc_init__(_s_,struct s4a_head,CHAR  ,1)
+#define r4_malloc_init_s4w(_s_)         r4_malloc_init__(_s_,struct s4w_head,WCHAR ,1)
+#define r4_malloc_init_s4z(_s_)         r4_malloc_init__(_s_,struct s4z_head,CHAR  ,1)
+#define r4_malloc_init_s4f(_a_)         r4_malloc_init__(_a_,struct s4p_head,FLOAT ,0)
+#define r4_malloc_init_s4d(_a_)         r4_malloc_init__(_a_,struct s4p_head,DOUBLE,0)
+#define r4_malloc_init_s4i(_a_)         r4_malloc_init__(_a_,struct s4p_head,INT   ,0)
+#define r4_malloc_init_s4u(_a_)         r4_malloc_init__(_a_,struct s4p_head,UINT  ,0)
+#define r4_malloc_init_s4i8(_a_)        r4_malloc_init__(_a_,struct s4p_head,INT8  ,0)
+#define r4_malloc_init_s4u8(_a_)        r4_malloc_init__(_a_,struct s4p_head,UINT8 ,0)
+#define r4_malloc_init_s4i16(_a_)       r4_malloc_init__(_a_,struct s4p_head,INT16 ,0)
+#define r4_malloc_init_s4u16(_a_)       r4_malloc_init__(_a_,struct s4p_head,UINT16,0)
+#define r4_malloc_init_s4i32(_a_)       r4_malloc_init__(_a_,struct s4p_head,INT32 ,0)
+#define r4_malloc_init_s4u32(_a_)       r4_malloc_init__(_a_,struct s4p_head,UINT32,0)
+#define r4_malloc_init_s4i64(_a_)       r4_malloc_init__(_a_,struct s4p_head,INT64 ,0)
+#define r4_malloc_init_s4u64(_a_)       r4_malloc_init__(_a_,struct s4p_head,UINT64,0)
+#define r4_malloc_init_ss4a(_a_)        r4_malloc_init__(_a_,struct s4p_head,LPSTR ,0)
+#define r4_malloc_init_ss4w(_a_)        r4_malloc_init__(_a_,struct s4p_head,LPWSTR,0)
+#define r4_malloc_init_ss4z(_a_)        r4_malloc_init__(_a_,struct s4p_head,LPSTR ,0)
+#define r4_malloc_init_s4p(_a_)         r4_malloc_init__(_a_,struct s4p_head,LPVOID,0)
+#define r4_malloc_init_s4s(_a_,_b_)     r4_malloc_init__(_a_,struct s4p_head,_b_   ,0)
+#define r4_malloc_init_Uni(_p_)         D4Uni(_p_,r4_malloc_init,_p_)
+/*
+  Освобождение памяти после malloc
+  _p_ -- вектор
+*/
+
+#define r4_free__(_p_,_h_,_b_)          D4TriType(_p_,_b_,free(D4GetPtrHead__(_p_,_h_,_b_)))
+#define r4_free_s4a(_p_)                r4_free__(_p_,struct s4a_head,CHAR  )
+#define r4_free_s4w(_p_)                r4_free__(_p_,struct s4w_head,WCHAR )
+#define r4_free_s4z(_p_)                r4_free__(_p_,struct s4z_head,CHAR  )
+#define r4_free_s4f(_p_)                r4_free__(_p_,struct s4p_head,FLOAT )
+#define r4_free_s4d(_p_)                r4_free__(_p_,struct s4p_head,DOUBLE)
+#define r4_free_s4i(_p_)                r4_free__(_p_,struct s4p_head,INT   )
+#define r4_free_s4u(_p_)                r4_free__(_p_,struct s4p_head,UINT  )
+#define r4_free_s4i8(_p_)               r4_free__(_p_,struct s4p_head,INT8  )
+#define r4_free_s4u8(_p_)               r4_free__(_p_,struct s4p_head,UINT8 )
+#define r4_free_s4i16(_p_)              r4_free__(_p_,struct s4p_head,INT16 )
+#define r4_free_s4u16(_p_)              r4_free__(_p_,struct s4p_head,UINT16)
+#define r4_free_s4i32(_p_)              r4_free__(_p_,struct s4p_head,INT32 )
+#define r4_free_s4u32(_p_)              r4_free__(_p_,struct s4p_head,UINT32)
+#define r4_free_s4i64(_p_)              r4_free__(_p_,struct s4p_head,INT64 )
+#define r4_free_s4u64(_p_)              r4_free__(_p_,struct s4p_head,UINT64)
+#define r4_free_ss4a(_p_)               r4_free__(_p_,struct s4p_head,LPSTR )
+#define r4_free_ss4w(_p_)               r4_free__(_p_,struct s4p_head,LPWSTR)
+#define r4_free_ss4z(_p_)               r4_free__(_p_,struct s4p_head,LPSTR )
+#define r4_free_s4p(_p_)                r4_free__(_p_,struct s4p_head,LPVOID)
+#define r4_free_s4s(_p_,_b_)            r4_free__(_a_,struct s4p_head,_b_)
+#define r4_free_Uni(_p_)                D4Uni(_p_,r4_free,_p_)
+/*
   Получение количества элементов (исключая нулевой элемент для строк)
+  _p_ -- вектор
 */
 #define r4_get_count__(_,_p_)           (D4GetPtrHead_##_(_p_)->count)
 #define r4_get_count_s4a(_p_)           r4_get_count__(s4a  ,_p_)
@@ -240,6 +355,7 @@ struct s4s_head
 #define r4_get_count_Uni(_p_)           D4Uni(_p_,r4_get_count,_p_)
 /*
   Получение количества элементов вмещаемое в массив
+  _p_ -- вектор
 */
 #define r4_get_memsz__(_,_p_)           (D4GetPtrHead_##_(_p_)->memsz)
 #define r4_get_memsz_s4a(_p_)           r4_get_memsz__(s4a  ,_p_)
@@ -291,6 +407,51 @@ struct s4s_head
 #define D4ForAll_s4p(_p_,_i_,_n_)       D4ForAll__(s4p  ,_p_,_i_,_n_)
 #define D4ForAll_s4s(_p_,_i_,_n_)       D4ForAll__(s4s  ,_p_,_i_,_n_)
 #define D4ForAll_Uni(_p_,_i_,_n_)       D4Uni(_p_,D4ForAll,_p_,_i_,_n_)
+
+/*
+  Приписывает строку в конец
+  s4                    -- вектор
+  wsz                   -- строка символов
+  n                     -- количество символов для копирования ( 0 - если до нулевого символа )
+  return                -- старая длина строки
+*/
+static UINT r4_push_array_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
+{
+  if ( n == 0 ) { n = wcslen ( wsz )+1; }
+  struct s4w_head * const h = D4GetPtrHead_s4w(s4);
+  if ( h->memsz < h->count + n )
+  {
+    rLog_Error ( L"\t==> Нехватает места для объединения строк [%s] и [%s]\n" );
+    return h->count;
+  }
+  else
+  {
+    wmemcpy ( s4+h->count, wsz, n );
+    const UINT u = h->count;
+    h->count += n-1;
+    return u;
+  }
+}
+/*
+  Обрезает вектор с конца на указанный размер
+  s4                    -- вектор
+  n                     -- конеченая длина
+*/
+static UINT r4_cut_end_s4w ( const LPWSTR s4, const UINT n )
+{
+  struct s4w_head * const h = D4GetPtrHead_s4w(s4);
+  if ( h->count < n )
+  {
+    rLog_Error ( L"\t==> Невозможно обрезать строку за пределами строки [%s] (%u/%u)\n", n, h->count );
+    return h->count;
+  }
+  else
+  {
+    h->count = n;
+    s4[n] = L'\0';
+    return h->count;
+  }
+}
 
 
 VOID r4_test_alloca_init ( )

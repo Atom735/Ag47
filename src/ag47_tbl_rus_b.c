@@ -1,5 +1,5 @@
 ﻿
-struct
+struct g7_tbl_rus_B
 {
   WCHAR w[2];
   UINT u;
@@ -12,13 +12,13 @@ struct
 
 #define r7WideToLower(_i_) (((_i_)>=L'А'&&(_i_)<=L'Я')?((_i_)+0x20):((_i_)==L'Ё')?(L'ё'):(_i_))
 
-static INT r7CodePoint_RusB__rCmp_eq ( const LPCWSTR pkey, const __typeof__(g7CodePoint_RusB) * const pE )
+static INT r7CodePoint_RusB__rCmp_eq ( const LPCWSTR pkey, const __typeof__(*g7CodePoint_RusB) * const pE )
 {
-  return ((INT)pkey[0] - (INT)pE->w[0]) ?: ((INT)pkey[1] - (INT)pE->w[1]) ?: 0;
+  return ((INT)(pkey[0]) - (INT)(pE->w[0])) ?: ((INT)(pkey[1]) - (INT)(pE->w[1])) ?: 0;
 }
-static INT r7CodePoint_RusB__rCmp_case ( const LPCWSTR pkey, const __typeof__(g7CodePoint_RusB) * const pE )
+static INT r7CodePoint_RusB__rCmp_case ( const LPCWSTR pkey, const __typeof__(*g7CodePoint_RusB) * const pE )
 {
-  return ((INT)pkey[0] - (INT)pE->w[0]) ?: ((INT)pkey[1] - (INT)pE->w[1]) ?: 0;
+  return ((INT)(pkey[0]) - (INT)(pE->w[0])) ?: ((INT)(pkey[1]) - (INT)(pE->w[1])) ?: 0;
 }
 #define r7CodePoint_RusB_lower(_i_,_0_) ((((_i_)>=L'а'&&(_i_)<=L'я')||(_i_=='ё'))?(  ):(0))
 #define r7CodePoint_RusB_upper(_i_,_0_)

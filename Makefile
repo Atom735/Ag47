@@ -22,8 +22,17 @@ LDFLAGS := \
   -g \
   -static \
 
+DEPENDS := \
+  src/ag47_misc.c \
+  src/ag47_log.c \
+  src/ag47_tbl_rus_a.c \
+  src/ag47_tbl_rus_b.c \
+  src/ag47_arrays.c \
+  src/ag47_fs.c \
+
+
 all : main.exe
 	main
 
-main.exe : src/main.c src/ag47_arrays.c
+main.exe : src/main.c $(DEPENDS)
 	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $< $(LDFLAGS) -O3

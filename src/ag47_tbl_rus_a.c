@@ -1,5 +1,5 @@
 ﻿
-static UINT const g7CodePoint_RusA =
+static UINT const g7CodePoint_RusA[] =
 {
   #define _D7x(_0_,_n_) _n_,
   #include "ag47_tbl_rus_a.x"
