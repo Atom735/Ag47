@@ -5,8 +5,8 @@
 #include <wchar.h>
 #include <wctype.h>
 
-LPWSTR g_s4wPathToWordConv = NULL;
-LPWSTR g_s4wPathTo7Zip = NULL;
+#define kPathMax PATH_MAX
+LPWSTR s4wPathOut = NULL;
 
 #include "ag47_misc.c"
 #include "ag47_log.c"
@@ -42,7 +42,17 @@ UINT nFiles = 0;
 LPWSTR s4wPFolders = 0;
 
 
-static UINT rParse_Docx ( const LPWSTR s4wPath )
+
+
+static UINT rParse_Docx ( const LPCWSTR s4wPath, const LPCWSTR s4wOrigin )
+{
+  return 0;
+}
+static UINT rParse_Txt ( const LPCWSTR s4wPath, const LPCWSTR s4wOrigin )
+{
+  return 0;
+}
+static UINT rParse_Las ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin )
 {
   return 0;
 }
@@ -54,6 +64,7 @@ UINT rFileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
 {
   const UINT n1 = r4_push_array_s4w_sz ( s4wPFolders, L"\\", 2 );
   r4_push_array_s4w_sz ( s4wPFolders, wszFileName, 0 );
+
 
   if ( r4_search_template_wsz ( s4wPath, L"*.las", FALSE ) ||
        r4_search_template_wsz ( s4wPath, L"*.las[?]", FALSE ) ||
@@ -73,7 +84,7 @@ UINT rFileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
     {
       r4_push_array_s4w_sz ( s4wPFolders, L".DIR", 5 );
       rFS_Run_7Zip ( s4wPath, s4wPFolders );
-      LPWSTR s4w = r4_alloca_s4w ( 2048 );
+      LPWSTR s4w = r4_alloca_s4w ( kPathMax );
       r4_push_array_s4w_sz ( s4w, s4wPFolders, r4_get_count_s4w(s4wPFolders)+1 );
       rFS_Tree ( s4w, rFileProc, rFolderProc );
     }
@@ -82,18 +93,18 @@ UINT rFileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
     {
       r4_push_array_s4w_sz ( s4wPFolders, L".DOCX", 6 );
       rFS_Run_WordConv ( s4wPath, s4wPFolders );
-      LPWSTR s4w = r4_alloca_s4w ( 2048 );
+      LPWSTR s4w = r4_alloca_s4w ( kPathMax );
       r4_push_array_s4w_sz ( s4w, s4wPFolders, r4_get_count_s4w(s4wPFolders)+1 );
       r4_push_array_s4w_sz ( s4w, L".DIR", 5 );
       rFS_Run_7Zip ( s4wPFolders, s4w );
-      rParse_Docx ( s4w );
+      // rParse_Docx ( s4w );
     }
     else
     if ( r4_search_template_wsz ( s4wPath, L"*.docx", FALSE ) )
     {
       r4_push_array_s4w_sz ( s4wPFolders, L".DIR", 5 );
       rFS_Run_7Zip ( s4wPath, s4wPFolders );
-      rParse_Docx ( s4wPFolders );
+      // rParse_Docx ( s4wPFolders );
     }
     else
     if ( !CopyFile ( s4wPath, s4wPFolders, TRUE ) )
@@ -121,74 +132,17 @@ UINT rFolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName )
 
 
 
-static UINT rSearchExe ( )
-{
-  WIN32_FIND_DATA ffd;
-  {
-    const HANDLE hFind = FindFirstFile ( L"C:/Program Files (x86)/Microsoft Office/Office*", &ffd );
-    if ( hFind == INVALID_HANDLE_VALUE )
-    {
-      rLog_Error ( L"Невозможно найти папку с установленным [MS Office]\n" );
-      FindClose ( hFind );
-      return __LINE__;
-    }
-    do
-    {
-      r4_cut_end_s4w ( g_s4wPathToWordConv, 0 );
-      r4_push_array_s4w_sz ( g_s4wPathToWordConv, L"C:/Program Files (x86)/Microsoft Office/", 0 );
-      r4_push_array_s4w_sz ( g_s4wPathToWordConv, ffd.cFileName, 0 );
-      r4_push_array_s4w_sz ( g_s4wPathToWordConv, L"/wordconv.exe", 0 );
-      WIN32_FIND_DATA _ffd;
-      const HANDLE _hFind = FindFirstFile ( g_s4wPathToWordConv, &_ffd );
-      if ( _hFind != INVALID_HANDLE_VALUE )
-      {
-        rLog ( L"!INFO: [wordconv.exe] найден по пути: %s\n", g_s4wPathToWordConv );
-        FindClose ( _hFind );
-        FindClose ( hFind );
-        goto P_7Zip;
-      }
-    } while ( FindNextFile ( hFind, &ffd ) );
-    FindClose ( hFind );
-    rLog_Error ( L"Невозможно найти [wordconv.exe]\n" );
-    r4_cut_end_s4w ( g_s4wPathToWordConv, 0 );
-    return __LINE__;
-  }
-  P_7Zip:
-  {
-    r4_cut_end_s4w ( g_s4wPathTo7Zip, 0 );
-    r4_push_array_s4w_sz ( g_s4wPathTo7Zip, L"C:/Program Files/7-Zip/7z.exe", 0 );
-    const HANDLE hFind = FindFirstFile ( g_s4wPathTo7Zip, &ffd );
-    if ( hFind == INVALID_HANDLE_VALUE )
-    {
-      rLog_Error ( L"Невозможно найти [7z.exe], возможно не установлен [7zip]\n" );
-      FindClose ( hFind );
-      r4_cut_end_s4w ( g_s4wPathTo7Zip, 0 );
-      return __LINE__;
-    }
-    rLog ( L"!INFO: [7z.exe] найден по пути: %s\n", g_s4wPathTo7Zip );
-    FindClose ( hFind );
-  }
-  return 0;
-}
 
 INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, INT nShowCmd )
 {
   AllocConsole ( );
-
   g_s4wPathToWordConv = r4_alloca_s4w ( PATH_MAX );
   g_s4wPathTo7Zip = r4_alloca_s4w ( PATH_MAX );
+  rFS_SearchExe ( );
+  s4wPathOut = r4_alloca_init_ex_s4w ( L"\\\\?\\", kPathMax );
+  rFS_GetCurrentDirectory_s4w ( s4wPathOut );
+  r4_push_array_s4w_sz ( s4wPFolders, L"\\.ag47", 0 );
 
-  rSearchExe ( );
-
-  s4wPFolders = r4_alloca_init_ex_s4w ( L"\\\\?\\", 2048 );
-  {
-    const UINT u = GetCurrentDirectory ( 2048-r4_get_count_s4w(s4wPFolders), s4wPFolders+r4_get_count_s4w(s4wPFolders) );
-    if ( u == 0 )
-    {
-      rLog_Error_WinAPI ( GetCurrentDirectory, GetLastError(), s4wPFolders );
-    }
-    r4_get_count_s4w(s4wPFolders) += u;
-  }
 
   r4_push_array_s4w_sz ( s4wPFolders, L"\\.ag47", 0 );
   if ( ! CreateDirectory ( s4wPFolders, NULL ) )
@@ -201,7 +155,7 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
     rLog_Error_WinAPI ( CreateDirectory, GetLastError(), s4wPFolders );
   }
 
-  const LPWSTR s4w = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public", 2048 );
+  const LPWSTR s4w = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public", kPathMax );
   rFS_Tree ( s4w, rFileProc, rFolderProc );
   rLog ( L"\t\t==>% 14u ==> All files (%u)\n", nSizes, nFiles );
   rLog ( NULL );

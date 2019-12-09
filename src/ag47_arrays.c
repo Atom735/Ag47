@@ -492,6 +492,13 @@ static LPCWSTR r4_search_template_wsz ( LPCWSTR wszS, LPCWSTR wszT, const BOOL b
 }
 
 
+static BOOL r4_path_ending_s4w ( const LPCWSTR s4w, LPCWSTR wsz, UINT n )
+{
+  if ( n == 0 ) { n = wcslen ( wsz ); }
+  if ( r4_get_count_s4w ( s4w ) < n ) return FALSE;
+  return ( _wcsnicmp_l ( s4w + r4_get_count_s4w ( s4w ) - n, wsz, n, L"C" ) == 0 );
+}
+
 VOID r4_test_alloca_init ( )
 {
   setlocale ( LC_ALL, "" );
