@@ -3,43 +3,43 @@ static WCHAR const g7CharMap[][0x80] =
 {
   #define _D7x(_a_,_w_,_s_) [_a_-0x80] = _w_,
   #define _D7xA(_a_,_w_,_s_)
-  // {
-  //   #include "ag47_tbl_map_KZ1048.x"
-  // },
-  {
-    #include "ag47_tbl_map_cp866_DOSCyrillicRussian.x"
-  },
-  {
-    #include "ag47_tbl_map_cp1251.x"
-  },
-  {
-    #include "ag47_tbl_map_cp855_DOSCyrillic.x"
-  },
-  {
-    #include "ag47_tbl_map_cp10007_MacCyrillic.x"
-  },
-  {
-    #include "ag47_tbl_map_ISO8859-5.x"
-  },
-  {
-    #include "ag47_tbl_map_KOI8-U.x"
-  },
+  #define _D7xPre(_i_,_ss_,_sl_) {
+  #define _D7xPost() },
+  #include "ag47_maps.x"
   #undef _D7x
   #undef _D7xA
+  #undef _D7xPre
+  #undef _D7xPost
 };
+
+#define g7CharMapCount (sizeof(g7CharMap)/sizeof(*g7CharMap))
 
 static CHAR const * const g7CharMapNames[] =
 {
-  // "KZ1048",
-  "cp866_DOSCyrillicRussian",
-  "cp1251_WindowsCyrillic",
-  "cp855_DOSCyrillic",
-  "cp10007_MacCyrillic",
-  "ISO8859-5",
-  "KOI8-U",
+  #define _D7x(_a_,_w_,_s_)
+  #define _D7xA(_a_,_w_,_s_)
+  #define _D7xPre(_i_,_ss_,_sl_) _sl_,
+  #define _D7xPost()
+  #include "ag47_maps.x"
+  #undef _D7x
+  #undef _D7xA
+  #undef _D7xPre
+  #undef _D7xPost
+};
+static CHAR const * const g7CharMapCP[] =
+{
+  #define _D7x(_a_,_w_,_s_)
+  #define _D7xA(_a_,_w_,_s_)
+  #define _D7xPre(_i_,_ss_,_sl_) "."#_i_,
+  #define _D7xPost()
+  #include "ag47_maps.x"
+  #undef _D7x
+  #undef _D7xA
+  #undef _D7xPre
+  #undef _D7xPost
 };
 
-static UINT const g7CharMapCount = sizeof(g7CharMap)/sizeof(*g7CharMap);
+static _locale_t g7CharMapLocales[];
 
 static UINT const g7CodePoint_Rus1[] =
 {
@@ -96,19 +96,25 @@ static UINT rGetBufEndOfLine ( BYTE const * pBuf, UINT nSize )
 }
 #define D7_CharCode(_a_,_i_) (g7CharMap[_i_][_a_])
 
-
+static UINT rLocalsInit ( )
+{
+  for ( UINT i = 0; i < g7CharMapCount; ++i )
+  {
+    g7CharMapLocales[i] = _create_locale ( LC_ALL, g7CharMapCP[i] );
+    rLog ( L"%-64.64hs%hs\n", g7CharMapNames[i], setlocale ( LC_ALL, g7CharMapCP[i] ) );
+  }
+  setlocale ( LC_ALL, "C" );
+}
+static UINT rLocalsFree ( )
+{
+  for ( UINT i = 0; i < g7CharMapCount; ++i )
+  {
+    _free_locale ( g7CharMapLocales[i] );
+  }
+}
 
 static UINT rGetBufCodePageNums ( BYTE const * pBuf, UINT nSize, UINT a1[g7CharMapCount], UINT a2[g7CharMapCount] )
 {
-  return 0;
-}
-/*
-  Птаемся определить кодировку
-*/
-static UINT rGetBufCodePage ( BYTE const * pBuf, UINT nSize )
-{
-  UINT a1[g7CharMapCount];
-  UINT a2[g7CharMapCount];
   for ( UINT i = 0; i < g7CharMapCount; ++i )
   {
     a1[i] = a2[i] = 0;
@@ -137,13 +143,19 @@ static UINT rGetBufCodePage ( BYTE const * pBuf, UINT nSize )
       }
     }
   }
-  for ( UINT i = 0; i < g7CharMapCount; ++i )
-  {
-    rLog ( L" >>> %-16.16hs = % 10u % 10u\n", g7CharMapNames[i], a1[i], a2[i] );
-  }
-  UINT k = 0;
-  for ( UINT i = 1; i < g7CharMapCount; ++i ) { if ( a2[i] > a2[k] ) { k = i; } }
-  return k;
+  return 0;
+}
+
+
+/*
+  Птаемся определить кодировку
+*/
+static UINT rGetBufCodePage ( BYTE const * pBuf, const UINT nSize )
+{
+  UINT a1[g7CharMapCount];
+  UINT a2[g7CharMapCount];
+  rGetBufCodePageNums ( pBuf, nSize, a1, a2 );
+  return rGetMaxNums ( a2, g7CharMapCount );
 }
 
 

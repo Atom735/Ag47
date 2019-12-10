@@ -24,9 +24,7 @@ static _locale_t g_locale_C = NULL;
 
 INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, INT nShowCmd )
 {
-
-
-
+  rLocalsInit ( );
   g_locale_C = _create_locale ( LC_ALL, "C" );
   AllocConsole ( );
   g_s4wPathToWordConv = r4_alloca_s4w ( PATH_MAX );
@@ -51,5 +49,6 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
 
   rLog ( NULL );
   _free_locale ( g_locale_C );
+  rLocalsFree ( );
   return iErr;
 }
