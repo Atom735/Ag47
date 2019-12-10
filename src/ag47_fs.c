@@ -100,8 +100,9 @@ static UINT rFS_AddDir ( const LPWSTR s4w, const LPCWSTR wsz, const UINT k )
 */
 static UINT rFS_Tree ( const LPWSTR s4wPath,
         UINT (*prFileProc)( const LPWSTR s4wPath, const LPCWSTR wszFileName,
-        const UINT nFileSize ), UINT (*prFolderProc)( const LPWSTR s4wPath,
-        const LPCWSTR wszFolderName ) )
+        const UINT nFileSize, const LPWSTR s4wOrigin ),
+        UINT (*prFolderProc)( const LPWSTR s4wPath, const LPCWSTR wszFolderName,
+        const LPWSTR s4wOrigin ), const LPWSTR s4wOrigin )
 {
   WIN32_FIND_DATA ffd;
   UINT iErr = 0;
@@ -121,9 +122,9 @@ static UINT rFS_Tree ( const LPWSTR s4wPath,
     const UINT n2 = r4_push_array_s4w_sz ( s4wPath, L"\\", 2 );
     r4_push_array_s4w_sz ( s4wPath, ffd.cFileName, 0 );
     if ( ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
-    { if ( prFolderProc ) { if ( ( iErr = prFolderProc ( s4wPath, ffd.cFileName ) ) ) goto P_Err; } }
+    { if ( prFolderProc ) { if ( ( iErr = prFolderProc ( s4wPath, ffd.cFileName, s4wOrigin ) ) ) goto P_Err; } }
     else
-    { if ( prFileProc ) { if ( ( iErr = prFileProc ( s4wPath, ffd.cFileName, ffd.nFileSizeLow ) ) ) goto P_Err; } }
+    { if ( prFileProc ) { if ( ( iErr = prFileProc ( s4wPath, ffd.cFileName, ffd.nFileSizeLow, s4wOrigin ) ) ) goto P_Err; } }
     r4_cut_end_s4w ( s4wPath, n2 );
   } while ( FindNextFile ( hFind, &ffd ) );
   P_Err:
@@ -207,11 +208,12 @@ static UINT rFS_NewRandDir_s4w ( const LPWSTR s4w )
 }
 
 UINT rFS_DeleteTree_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
-        const UINT nFileSize );
-UINT rFS_DeleteTree_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName );
+        const UINT nFileSize, const LPWSTR s4wOrigin );
+UINT rFS_DeleteTree_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName,
+                                const LPWSTR s4wOrigin );
 
 UINT rFS_DeleteTree_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
-        const UINT nFileSize )
+        const UINT nFileSize, const LPWSTR s4wOrigin )
 {
   if ( !DeleteFile ( s4wPath ) )
   {
@@ -221,9 +223,10 @@ UINT rFS_DeleteTree_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
   return 0;
 }
 
-UINT rFS_DeleteTree_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName )
+UINT rFS_DeleteTree_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName,
+        const LPWSTR s4wOrigin )
 {
-  const UINT iErr = rFS_Tree ( s4wPath, rFS_DeleteTree_FileProc, rFS_DeleteTree_FolderProc );
+  const UINT iErr = rFS_Tree ( s4wPath, rFS_DeleteTree_FileProc, rFS_DeleteTree_FolderProc, s4wOrigin );
   if ( iErr ) return iErr;
   if ( !RemoveDirectory ( s4wPath ) )
   {
@@ -235,7 +238,7 @@ UINT rFS_DeleteTree_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderNa
 
 static UINT rFS_DeleteTree ( const LPWSTR s4w )
 {
-  const UINT iErr = rFS_Tree ( s4w, rFS_DeleteTree_FileProc, rFS_DeleteTree_FolderProc );
+  const UINT iErr = rFS_Tree ( s4w, rFS_DeleteTree_FileProc, rFS_DeleteTree_FolderProc, NULL  );
   if ( iErr ) return iErr;
   if ( !RemoveDirectory ( s4w ) )
   {

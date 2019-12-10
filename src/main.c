@@ -11,7 +11,6 @@
 static LPWSTR s4wPathOut = NULL;
 static LPWSTR s4wPathOutTempDir = NULL;
 static LPWSTR s4wPathOutLogsDir = NULL;
-static LPWSTR s4wPathOutLogs_7Zip = NULL;
 static _locale_t g_locale_C = NULL;
 
 #include "ag47_misc.c"
@@ -46,14 +45,14 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
   s4wPathOutLogsDir = r4_alloca_s4w ( kPathMax );
   r4_init_s4w_s4w ( s4wPathOutLogsDir, s4wPathOut );
   rFS_AddDir ( s4wPathOutLogsDir, L"\\.logs", 0 );
-  s4wPathOutLogs_7Zip = r4_alloca_s4w ( kPathMax );
-  r4_init_s4w_s4w ( s4wPathOutLogs_7Zip, s4wPathOutLogsDir );
-  r4_push_array_s4w_sz ( s4wPathOutLogs_7Zip, L"\\7zip.log", 0 );
 
 
-  const LPWSTR s4w = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public", kPathMax );
-  const UINT iErr = rParse_Tree ( s4w );
-  // rLog ( L"\t\t==>% 14u ==> All files (%u)\n", nSizes, nFiles );
+  // const LPWSTR s4wPathIn = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public", kPathMax );
+  const LPWSTR s4wPathIn = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public\\common\\Gilyazeev\\ГИС", kPathMax );
+  const LPWSTR  s4wPathOrigin = r4_alloca_s4w ( kPathMax );
+  r4_init_s4w_s4w ( s4wPathOrigin, s4wPathIn );
+  const UINT iErr = rParse_Tree ( s4wPathIn, s4wPathOrigin );
+
   rLog ( NULL );
   _free_locale ( g_locale_C );
   return iErr;
