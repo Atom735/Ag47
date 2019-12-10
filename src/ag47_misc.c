@@ -10,6 +10,6 @@ static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
 static UINT rGetMaxNums ( UINT const * const pData, const UINT nSize )
 {
   UINT k = 0;
-  for ( UINT i = 1; i < nSize; ++i ) { if ( pData[k] > pData[i] ) { k = i; } }
+  for ( UINT i = 1; i < nSize; ++i ) { if ( pData[i] > pData[k] ) { k = i; } }
   return k;
 }
