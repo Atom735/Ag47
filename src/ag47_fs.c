@@ -39,37 +39,7 @@ static UINT rFS_Run_7Zip ( const LPCWSTR wszIn, const LPCWSTR wszOut )
   r4_push_path_s4w_s4w ( cmd, wszOut );
   r4_push_array_s4w_sz ( cmd, L"\" \"", 4 );
   r4_push_path_s4w_s4w ( cmd, wszIn );
-  r4_push_array_s4w_sz ( cmd, L"\" > \"", 6 );
-  r4_push_path_s4w_s4w ( cmd, s4wPathOutLogs_7Zip );
   r4_push_array_s4w_sz ( cmd, L"\"", 2 );
-  return rFS_Run_Wait ( cmd );
-
-
-
-
-
-  r4_push_array_s4w_sz ( cmd, g_s4wPathTo7Zip, r4_get_count_s4w(g_s4wPathTo7Zip)+1 );
-  r4_push_array_s4w_sz ( cmd, L"\" x \"-o", 8 );
-  if ( wcsncmp ( wszOut, L"\\\\?\\UNC\\", 8 ) == 0 )
-  {
-    r4_push_array_s4w_sz ( cmd, L"\\", 2 );
-    r4_push_array_s4w_sz ( cmd, wszOut+7, 0 );
-  }
-  else
-  {
-    r4_push_array_s4w_sz ( cmd, wszOut, 0 );
-  }
-  r4_push_array_s4w_sz ( cmd, L"\" \"", 4 );
-  if ( wcsncmp ( wszIn, L"\\\\?\\UNC\\", 8 ) == 0 )
-  {
-    r4_push_array_s4w_sz ( cmd, L"\\", 2 );
-    r4_push_array_s4w_sz ( cmd, wszIn+7, 0 );
-  }
-  else
-  {
-    r4_push_array_s4w_sz ( cmd, wszIn, 0 );
-  }
-  r4_push_array_s4w_sz ( cmd, L"\" > \"", 6 );
   return rFS_Run_Wait ( cmd );
 }
 
@@ -77,28 +47,11 @@ static UINT rFS_Run_WordConv ( const LPCWSTR wszIn, const LPCWSTR wszOut )
 {
   const LPWSTR cmd = r4_alloca_s4w ( kPathMax*4 );
   r4_push_array_s4w_sz ( cmd, L"\"", 2 );
-  r4_push_array_s4w_sz ( cmd, g_s4wPathToWordConv, r4_get_count_s4w(g_s4wPathToWordConv)+1 );
+  r4_push_path_s4w_s4w ( cmd, g_s4wPathToWordConv );
   r4_push_array_s4w_sz ( cmd, L"\" -oice -nme \"", 15 );
-  if ( wcsncmp ( wszIn, L"\\\\?\\UNC\\", 8 ) == 0 )
-  {
-    r4_push_array_s4w_sz ( cmd, L"\\", 2 );
-    r4_push_array_s4w_sz ( cmd, wszIn+7, 0 );
-  }
-  else
-  {
-    r4_push_array_s4w_sz ( cmd, wszIn, 0 );
-  }
+  r4_push_path_s4w_s4w ( cmd, wszIn );
   r4_push_array_s4w_sz ( cmd, L"\" \"", 4 );
-
-  if ( wcsncmp ( wszOut, L"\\\\?\\UNC\\", 8 ) == 0 )
-  {
-    r4_push_array_s4w_sz ( cmd, L"\\", 2 );
-    r4_push_array_s4w_sz ( cmd, wszOut+7, 0 );
-  }
-  else
-  {
-    r4_push_array_s4w_sz ( cmd, wszOut, 0 );
-  }
+  r4_push_path_s4w_s4w ( cmd, wszOut );
   r4_push_array_s4w_sz ( cmd, L"\"", 2 );
   return rFS_Run_Wait ( cmd );
 }
