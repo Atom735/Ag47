@@ -133,7 +133,11 @@ static UINT rFS_Tree ( const LPWSTR s4wPath,
 }
 
 
-
+/*
+  Поиск вспомогательных программ
+  путь к [7Zip] будет записан в [g_s4wPathTo7Zip]
+  путь к [WordConv] будет записан в [g_s4wPathToWordConv]
+*/
 static UINT rFS_SearchExe ( )
 {
   WIN32_FIND_DATA ffd;
@@ -235,7 +239,10 @@ UINT rFS_DeleteTree_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderNa
   }
   return 0;
 }
-
+/*
+  Удаляет папку и его содержимое
+  s4w                   -- Путь к папке которую удаляем
+*/
 static UINT rFS_DeleteTree ( const LPWSTR s4w )
 {
   const UINT iErr = rFS_Tree ( s4w, rFS_DeleteTree_FileProc, rFS_DeleteTree_FolderProc, NULL  );
@@ -245,5 +252,52 @@ static UINT rFS_DeleteTree ( const LPWSTR s4w )
     rLog_Error_WinAPI ( RemoveDirectory, GetLastError(), L"%s\n", s4w );
     return __LINE__;
   }
+  return 0;
+}
+
+struct file_map
+{
+  HANDLE                hFile;
+  HANDLE                hMapping;
+  UINT                  nSize;
+  BYTE          const * pData;
+};
+
+static UINT rFS_FileMapClose ( struct file_map * const pMap )
+{
+  UINT iErr = 0;
+  if ( pMap->pData && !UnmapViewOfFile ( pMap->pData ) ) { rLog_Error_WinAPI ( UnmapViewOfFile, GetLastError(), L"Data\n" ); iErr = __LINE__; }
+  if ( pMap->hMapping && !CloseHandle ( pMap->hMapping ) ) { rLog_Error_WinAPI ( CloseHandle, GetLastError(), L"Mapping\n" ); iErr = __LINE__; }
+  if ( pMap->hFile && !CloseHandle ( pMap->hFile ) ) { rLog_Error_WinAPI ( CloseHandle, GetLastError(), L"File\n" ); iErr = __LINE__; }
+  *pMap = ((struct file_map){ NULL, NULL, 0, NULL });
+  return iErr;
+}
+
+static UINT rFS_FileMapOpen ( struct file_map * const pMap, const LPCWSTR wszFilePath )
+{
+  struct file_map fm = { };
+  if ( ( fm.hFile = CreateFile ( wszFilePath, GENERIC_READ, FILE_SHARE_READ, NULL,
+          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL ) ) == INVALID_HANDLE_VALUE )
+  {
+    rLog_Error_WinAPI ( CreateFile, GetLastError(), L"%s\n", wszFilePath );
+    fm.hFile = NULL;
+    return __LINE__;
+  }
+  if ( ( fm.nSize = GetFileSize ( fm.hFile, NULL ) ) == INVALID_FILE_SIZE )
+  {
+    rLog_Error_WinAPI ( GetFileSize, GetLastError(), L"%s\n", wszFilePath );
+    return rFS_FileMapClose ( &fm );
+  }
+  if ( ( fm.hMapping = CreateFileMapping ( fm.hFile, NULL, PAGE_READONLY, 0, 0, NULL ) ) == NULL )
+  {
+    rLog_Error_WinAPI ( CreateFileMapping, GetLastError(), L"%s\n", wszFilePath );
+    return rFS_FileMapClose ( &fm );
+  }
+  if ( ( fm.pData = (BYTE const*) MapViewOfFileEx ( fm.hMapping, FILE_MAP_READ, 0, 0, 0, NULL ) ) == NULL )
+  {
+    rLog_Error_WinAPI ( MapViewOfFileEx, GetLastError(), L"%s\n", wszFilePath );
+    return rFS_FileMapClose ( &fm );
+  }
+  *pMap = fm;
   return 0;
 }
