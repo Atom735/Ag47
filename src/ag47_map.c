@@ -14,7 +14,7 @@ static WCHAR const g7CharMap[][0x80] =
 
 #define g7CharMapCount (sizeof(g7CharMap)/sizeof(*g7CharMap))
 
-static CHAR const * const g7CharMapNames[] =
+static CHAR const * const g7CharMapNames[g7CharMapCount] =
 {
   #define _D7x(_a_,_w_,_s_)
   #define _D7xA(_a_,_w_,_s_)
@@ -26,7 +26,7 @@ static CHAR const * const g7CharMapNames[] =
   #undef _D7xPre
   #undef _D7xPost
 };
-static CHAR const * const g7CharMapCP[] =
+static CHAR const * const g7CharMapCP[g7CharMapCount] =
 {
   #define _D7x(_a_,_w_,_s_)
   #define _D7xA(_a_,_w_,_s_)
@@ -39,7 +39,7 @@ static CHAR const * const g7CharMapCP[] =
   #undef _D7xPost
 };
 
-static _locale_t g7CharMapLocales[];
+static _locale_t g7CharMapLocales[g7CharMapCount];
 
 static UINT const g7CodePoint_Rus1[] =
 {
@@ -104,6 +104,7 @@ static UINT rLocalsInit ( )
     rLog ( L"%-64.64hs%hs\n", g7CharMapNames[i], setlocale ( LC_ALL, g7CharMapCP[i] ) );
   }
   setlocale ( LC_ALL, "C" );
+  return 0;
 }
 static UINT rLocalsFree ( )
 {
@@ -111,9 +112,10 @@ static UINT rLocalsFree ( )
   {
     _free_locale ( g7CharMapLocales[i] );
   }
+  return 0;
 }
 
-static UINT rGetBufCodePageNums ( BYTE const * pBuf, UINT nSize, UINT a1[g7CharMapCount], UINT a2[g7CharMapCount] )
+static UINT rGetBufCodePage ( BYTE const * pBuf, UINT nSize, UINT a1[g7CharMapCount], UINT a2[g7CharMapCount] )
 {
   for ( UINT i = 0; i < g7CharMapCount; ++i )
   {
@@ -143,18 +145,6 @@ static UINT rGetBufCodePageNums ( BYTE const * pBuf, UINT nSize, UINT a1[g7CharM
       }
     }
   }
-  return 0;
-}
-
-
-/*
-  Птаемся определить кодировку
-*/
-static UINT rGetBufCodePage ( BYTE const * pBuf, const UINT nSize )
-{
-  UINT a1[g7CharMapCount];
-  UINT a2[g7CharMapCount];
-  rGetBufCodePageNums ( pBuf, nSize, a1, a2 );
   return rGetMaxNums ( a2, g7CharMapCount );
 }
 
