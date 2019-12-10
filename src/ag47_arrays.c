@@ -94,22 +94,22 @@ struct s4s_head
 // #define D4TriIf(_e_,_t_,_f_)            __mingw_choose_expr(_e_,_t_,_f_)
 // #define D4TypeOf(_p_,_t_)               __mingw_types_compatible_p(__typeof__(_p_),_t_)
 #define D4PrintWarnOfType()             fprintf(stderr,"Warning of types in %s : %d\n",__FILE__,__LINE__),fflush(stderr)
-#define D4TriType(_p_,_t_,_f_)          _Generic(_p_,_t_*:_f_,default:(D4PrintWarnOfType(),_f_))
+#define D4TriType(_p_,_t_,_f_)          _Generic(_p_,_t_*:_f_,_t_ const *:_f_,default:(D4PrintWarnOfType(),_f_))
 #define D4Uni(_p_,_f_,...)              _Generic(_p_,\
-    CHAR  *:_f_##_s4a  ,\
-    WCHAR *:_f_##_s4w  ,\
-    FLOAT *:_f_##_s4f  ,\
-    DOUBLE*:_f_##_s4d  ,\
-    INT   *:_f_##_s4i  ,\
-    UINT  *:_f_##_s4u  ,\
-    INT8  *:_f_##_s4i8 ,\
-    UINT8 *:_f_##_s4u8 ,\
-    INT16 *:_f_##_s4i16,\
-    INT64 *:_f_##_s4i64,\
-    UINT64*:_f_##_s4u64,\
-    LPSTR *:_f_##_ss4a ,\
-    LPWSTR*:_f_##_ss4w ,\
-    LPVOID*:_f_##_s4p  ,\
+    CHAR  *:_f_##_s4a  ,CHAR   const*:_f_##_s4a  ,\
+    WCHAR *:_f_##_s4w  ,WCHAR  const*:_f_##_s4w  ,\
+    FLOAT *:_f_##_s4f  ,FLOAT  const*:_f_##_s4f  ,\
+    DOUBLE*:_f_##_s4d  ,DOUBLE const*:_f_##_s4d  ,\
+    INT   *:_f_##_s4i  ,INT    const*:_f_##_s4i  ,\
+    UINT  *:_f_##_s4u  ,UINT   const*:_f_##_s4u  ,\
+    INT8  *:_f_##_s4i8 ,INT8   const*:_f_##_s4i8 ,\
+    UINT8 *:_f_##_s4u8 ,UINT8  const*:_f_##_s4u8 ,\
+    INT16 *:_f_##_s4i16,INT16  const*:_f_##_s4i16,\
+    INT64 *:_f_##_s4i64,INT64  const*:_f_##_s4i64,\
+    UINT64*:_f_##_s4u64,UINT64 const*:_f_##_s4u64,\
+    LPSTR *:_f_##_ss4a ,LPSTR  const*:_f_##_ss4a ,\
+    LPWSTR*:_f_##_ss4w ,LPWSTR const*:_f_##_ss4w ,\
+    LPVOID*:_f_##_s4p  ,LPVOID const*:_f_##_s4p  ,\
     default:WTF)(__VA_ARGS__)
 
 /*
@@ -432,6 +432,7 @@ static UINT r4_push_array_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
     return u;
   }
 }
+#define r4_push_array_s4w_s4w(_p_,_w_) r4_push_array_s4w_sz(_p_,_w_,r4_get_count_s4w(_w_)+1)
 /*
   Обрезает вектор с конца на указанный размер
   s4                    -- вектор
@@ -522,40 +523,46 @@ static UINT r4_push_path_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
 }
 #define r4_push_path_s4w_s4w(_p_,_w_) r4_push_path_s4w_sz(_p_,_w_,r4_get_count_s4w(_w_)+1)
 
-static BOOL r4_path_ending_s4w ( const LPWSTR s4w, LPCWSTR wsz, UINT n )
+static BOOL r4_path_ending_s4w ( const LPCWSTR s4w, LPCWSTR wsz, UINT n )
 {
   if ( n == 0 ) { n = wcslen ( wsz ); }
   if ( r4_get_count_s4w ( s4w ) < n ) return FALSE;
   return ( r4_icmp_s4w ( s4w + r4_get_count_s4w ( s4w ) - n, wsz, n ) );
 }
-
+#define r4_path_ending_s4w_s4w(_p_,_w_) r4_path_ending_s4w (_p_,_w_,r4_get_count_s4w (_w_))
 
 static BOOL r4_path_ending_s4w_las ( const LPCWSTR s4w )
 {
   const LPWSTR w = r4_alloca_init_ex_s4w ( L".las", 8 );
-  if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
-  r4_init_s4w ( w, L".las[1]", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
-  r4_init_s4w ( w, L".las[2]", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
+  r4_init_s4w ( w, L".las[1]", 0 ); if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
+  r4_init_s4w ( w, L".las[2]", 0 ); if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
+  return FALSE;
+}
+static BOOL r4_path_ending_s4w_txt ( const LPCWSTR s4w )
+{
+  const LPWSTR w = r4_alloca_init_ex_s4w ( L".txt", 8 );
+  if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
   return FALSE;
 }
 static BOOL r4_path_ending_s4w_doc ( const LPCWSTR s4w )
 {
   const LPWSTR w = r4_alloca_init_ex_s4w ( L".doc", 5 );
-  if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
   return FALSE;
 }
 static BOOL r4_path_ending_s4w_docx ( const LPCWSTR s4w )
 {
   const LPWSTR w = r4_alloca_init_ex_s4w ( L".docx", 6 );
-  if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
   return FALSE;
 }
 static BOOL r4_path_ending_s4w_zip ( const LPCWSTR s4w )
 {
   const LPWSTR w = r4_alloca_init_ex_s4w ( L".zip", 5 );
-  if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
-  r4_init_s4w ( w, L".rar", 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
-  r4_init_s4w ( w, L".7z" , 0 ); if ( r4_path_ending_s4w ( s4w, w, r4_get_count_s4w ( w ) ) ) return TRUE;
+  if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
+  r4_init_s4w ( w, L".rar", 0 ); if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
+  r4_init_s4w ( w, L".7z" , 0 ); if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
   return FALSE;
 }
 
