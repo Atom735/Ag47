@@ -4,6 +4,7 @@
   struct file_map fm = { };
   rFS_FileMapOpen ( &fm, s4wPath );
 
+  UINT k = rGetBufCodePage ( fm.pData, fm.nSize );
 
 
 

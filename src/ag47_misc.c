@@ -5,3 +5,4 @@ static FILE * rOpenFileToWriteWith_UTF16_BOM ( const LPCWSTR wszFname )
   if ( fd ) fwprintf ( fd, L"%c", 0xFEFF );
   return fd;
 }
+

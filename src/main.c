@@ -13,10 +13,10 @@ static LPWSTR s4wPathOutTempDir = NULL;
 static LPWSTR s4wPathOutLogsDir = NULL;
 static _locale_t g_locale_C = NULL;
 
+
 #include "ag47_misc.c"
 #include "ag47_log.c"
-#include "ag47_tbl_rus_a.c"
-#include "ag47_tbl_rus_b.c"
+#include "ag47_map.c"
 #include "ag47_arrays.c"
 #include "ag47_fs.c"
 #include "ag47_parse_las.c"
@@ -24,6 +24,9 @@ static _locale_t g_locale_C = NULL;
 
 INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, INT nShowCmd )
 {
+
+
+
   g_locale_C = _create_locale ( LC_ALL, "C" );
   AllocConsole ( );
   g_s4wPathToWordConv = r4_alloca_s4w ( PATH_MAX );
