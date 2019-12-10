@@ -29,6 +29,7 @@ DEPENDS := \
   src/ag47_tbl_rus_b.c \
   src/ag47_arrays.c \
   src/ag47_fs.c \
+  src/ag47_parse_las.c \
   src/ag47_parse.c \
 
 OUT_EXE := main.exe

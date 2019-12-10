@@ -19,15 +19,8 @@ static _locale_t g_locale_C = NULL;
 #include "ag47_tbl_rus_b.c"
 #include "ag47_arrays.c"
 #include "ag47_fs.c"
+#include "ag47_parse_las.c"
 #include "ag47_parse.c"
-
-
-
-
-
-
-
-
 
 INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, INT nShowCmd )
 {
