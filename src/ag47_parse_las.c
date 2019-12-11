@@ -237,6 +237,41 @@ static UINT rParse_Las ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const LP
   _.iSection            = 0;
   setlocale ( LC_ALL, g7CharMapCP[_.iCodePage] );
 
+  static UINT nFile = 0;
+  CHAR str[512];
+  sprintf ( str, ".ag47/" );
+  CreateDirectoryA ( str, NULL );
+  sprintf ( str, ".ag47/.db" );
+  CreateDirectoryA ( str, NULL );
+  sprintf ( str, ".ag47/.db/%02u", (nFile/1000000) );
+  CreateDirectoryA ( str, NULL );
+  sprintf ( str, ".ag47/.db/%02u/%02u/", (nFile/1000000), (nFile/10000)%100 );
+  CreateDirectoryA ( str, NULL );
+  sprintf ( str, ".ag47/.db/%02u/%02u/%04u.las", (nFile/1000000), (nFile/10000)%100, nFile%10000 );
+  ++nFile;
+  FILE * const pF = fopen ( str, "wb" );
+  fprintf ( pF, "# Ag47_CodePage    = %hs (%hs)%hs",
+          g7CharMapCP[_.iCodePage], g7CharMapNames[_.iCodePage],
+          _.iLineFeed==0x0D0A?"\r\n":_.iLineFeed=='\r'?"\r":"\n" );
+  fprintf ( pF, "# Ag47_LineFeed    = %hs%hs",
+          _.iLineFeed == '\r' ? "CR (Mac)" : _.iLineFeed == '\n' ? "LF (Unix)" : _.iLineFeed == 0x0D0A ? "CRLF (Windows)" : "???",
+          _.iLineFeed==0x0D0A?"\r\n":_.iLineFeed=='\r'?"\r":"\n" );
+  fprintf ( pF, "# Ag47_Origin      = %ls%hs",
+          s4wOrigin,
+          _.iLineFeed==0x0D0A?"\r\n":_.iLineFeed=='\r'?"\r":"\n" );
+  fprintf ( pF, "# Ag47_Size        = %u%hs",
+          _.fm.nSize,
+          _.iLineFeed==0x0D0A?"\r\n":_.iLineFeed=='\r'?"\r":"\n" );
+  for ( UINT k = 0; k < g7CharMapCount; ++k )
+  {
+    fprintf ( pF, "# Ag47_CodePage[i] = %16.16hs (% 8u % 8u)%hs",
+            g7CharMapCP[k],a1[k],a2[k],
+            _.iLineFeed==0x0D0A?"\r\n":_.iLineFeed=='\r'?"\r":"\n" );
+  }
+  fwrite ( _.p, 1, _.n, pF );
+  fclose ( pF );
+
+  goto P_End;
   rParse_Las_Log ( L"%hc\t%hs\t%hs\t%hs\t%hs\t%s\t%u\r\n",
           '#',
           "FILESETS",

@@ -18,6 +18,7 @@ static _locale_t g_locale_C = NULL;
 #include "ag47_log.c"
 #include "ag47_map.c"
 #include "ag47_arrays.c"
+#include "ag47_settings.c"
 #include "ag47_fs.c"
 #include "ag47_parse_las.c"
 #include "ag47_parse.c"
@@ -42,7 +43,8 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
 
 
   // const LPWSTR s4wPathIn = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public", kPathMax );
-  const LPWSTR s4wPathIn = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public\\common\\Gilyazeev\\ГИС", kPathMax );
+  // const LPWSTR s4wPathIn = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public\\common\\Gilyazeev", kPathMax );
+  const LPWSTR s4wPathIn = r4_alloca_init_ex_s4w ( L".ag47", kPathMax );
   const LPWSTR  s4wPathOrigin = r4_alloca_s4w ( kPathMax );
   r4_init_s4w_s4w ( s4wPathOrigin, s4wPathIn );
   const UINT iErr = rParse_Tree ( s4wPathIn, s4wPathOrigin );

@@ -27,6 +27,7 @@ DEPENDS := \
   src/ag47_log.c \
   src/ag47_map.c \
   src/ag47_arrays.c \
+  src/ag47_settings.c \
   src/ag47_fs.c \
   src/ag47_parse_las.c \
   src/ag47_parse.c \
