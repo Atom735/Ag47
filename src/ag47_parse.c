@@ -84,7 +84,7 @@ UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
 UINT rParse_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName,
         const LPWSTR s4wOrigin )
 {
-  if ( _wcsicmp_l(wszFolderName,L".ag47",g_locale_C) == 0 ) { return 0; }
+  if ( _wcsicmp_l(wszFolderName,L".db",g_locale_C) == 0 ) { return 0; }
   const UINT n = r4_push_array_s4w_sz ( s4wOrigin, L"\\", 2 );
   r4_push_array_s4w_sz ( s4wOrigin, wszFolderName, 0 );
   const UINT iErr = rFS_Tree ( s4wPath, rParse_FileProc, rParse_FolderProc, s4wOrigin );

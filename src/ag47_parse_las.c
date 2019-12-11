@@ -20,69 +20,75 @@ static UINT rParse_Las_Log ( const LPCWSTR fmt, ... )
 }
 
 
+struct file_data_ptr    // указатель на данные файла
+{
+  BYTE          const * p;              // Указатель на данные
+  UINT                  n;              // Сколько данных осталось
+  UINT                  nLine;          // На какой линии указатель
+};
+
+static VOID rFileData_Skip ( struct file_data_ptr * const p, const UINT n )
+{
+  if ( p->n >= n ) { p->p += n; p->n -= n; }
+  else { p->p += p->n; p->n = 0; }
+}
+
+static VOID rFileData_SkipWhiteSpaces ( struct file_data_ptr * const p, const UINT iLineFeed )
+{
+  while ( p->n )
+  {
+    if ( *(p->p) == iLineFeed )
+    { ++(p->nLine); rFileData_Skip(p,1); }
+    else
+    if ( iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' )
+    { ++(p->nLine); rFileData_Skip(p,2 ); }
+    else
+    if ( *(p->p) == ' ' || *(p->p) == '\t' )
+    { rFileData_Skip(p,1); }
+    else
+    { return; }
+  }
+}
+static VOID rFileData_SkipToNewLine ( struct file_data_ptr * const p, const UINT iLineFeed )
+{
+  while ( p->n )
+  {
+    if ( *(p->p) == iLineFeed )
+    { ++(p->nLine); rFileData_Skip(p,1); return; }
+    else
+    if ( iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' )
+    { ++(p->nLine); rFileData_Skip(p,2); return; }
+    else
+    { rFileData_Skip(p,1); }
+  }
+}
+
 
 
 struct file_state_las
 {
   struct file_map       fm;
+  UINT                  iVersion;       // Версия LAS файла
   LPCWSTR               s4wOrigin;      // Путь к оригиналу файла
   UINT                  iCodePage;      // Номер кодировки
   UINT                  iLineFeed;      // Символ перехода на новую строку
-  BYTE          const * p;              // Указатель на данные
-  UINT                  n;              // Сколько данных осталось
-  UINT                  nLine;          // На какой линии происходит обработка
   BYTE                  iSection;       // В какой секции сейчас находимся
   UINT                  nWarnings;      // Количество предупреждений
-  struct
-  {
-    BYTE const *        p;
-    UINT                n;
-  } aMNEM, aUNIT, aDATA, aDESC, aLine;
+  struct file_data_ptr  t,
+          aMNEM, aUNIT, aDATA, aDESC, aLine;
 };
 
-#define D7LasSkip(_p_,_n_)  (((_p_)->p += (_n_)),((_p_)->n -= (_n_)))
-
-static VOID rParse_Las_SkipWhiteSpaces ( struct file_state_las * const p )
-{
-  while ( p->n )
-  {
-    if ( *(p->p) == p->iLineFeed )
-    { ++(p->nLine); D7LasSkip(p,1); }
-    else
-    if ( p->iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' )
-    { ++(p->nLine); D7LasSkip(p,2); }
-    else
-    if ( *(p->p) == ' ' || *(p->p) == '\t' )
-    { D7LasSkip(p,1); }
-    else
-    { return; }
-  }
-}
-
-static VOID rParse_Las_SkipToNewLine ( struct file_state_las * const p )
-{
-  while ( p->n )
-  {
-    if ( *(p->p) == p->iLineFeed )
-    { ++(p->nLine); D7LasSkip(p,1); return; }
-    else
-    if ( p->iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' )
-    { ++(p->nLine); D7LasSkip(p,2); return; }
-    else
-    { D7LasSkip(p,1); }
-  }
-}
 
 
 static UINT rParse_Las_SectionA ( struct file_state_las * const p )
 {
-  rParse_Las_SkipToNewLine ( p );
+  rFileData_SkipToNewLine ( &(p->t), p->iLineFeed );
   return 0;
 }
 
-static UINT rParse_Las_S_TrimWhiteSpaces ( struct file_state_las * const p )
+static UINT rParse_Las_S_TrimWhiteSpaces ( struct file_state_las * const pL )
 {
-  // rParse_Las_SkipToNewLine ( p );
+  // rFileData_SkipToNewLine ( &(p->t), p->iLineFeed );
   // return 0;
   // while ( p->aMNEM.n && ( *(p->aMNEM.p) == ' ' || *(p->aMNEM.p) == '\t' ) ) { ++(p->aMNEM.p); --(p->aMNEM.n); }
   // while ( p->aMNEM.n && ( p->aMNEM.p[p->aMNEM.n-1] == ' ' || p->aMNEM.p[p->aMNEM.n-1] == '\t' ) ) { --(p->aMNEM.n); }
@@ -95,19 +101,37 @@ static UINT rParse_Las_S_TrimWhiteSpaces ( struct file_state_las * const p )
   // while ( p->aLine.n && ( *(p->aLine.p) == ' ' || *(p->aLine.p) == '\t' ) ) { ++(p->aLine.p); --(p->aLine.n); }
   // while ( p->aLine.n && ( p->aLine.p[p->aLine.n-1] == ' ' || p->aLine.p[p->aLine.n-1] == '\t' ) ) { --(p->aLine.n); }
   rParse_Las_Log ( L"%hc\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
-          p->iSection,
-          p->aMNEM.n, p->aMNEM.p,
-          p->aUNIT.n, p->aUNIT.p,
-          p->aDATA.n, p->aDATA.p,
-          p->aDESC.n, p->aDESC.p,
-          p->s4wOrigin, p->nLine-1 );
+          pL->iSection,
+          pL->aMNEM.n, pL->aMNEM.p,
+          pL->aUNIT.n, pL->aUNIT.p,
+          pL->aDATA.n, pL->aDATA.p,
+          pL->aDESC.n, pL->aDESC.p,
+          pL->s4wOrigin, pL->t.nLine-1 );
   return 0;
 }
 
-static UINT rParse_Las_S_DATA ( struct file_state_las * const p )
+static UINT rParse_Las_S_DATA_2 ( struct file_state_las * const pL )
 {
-  p->aDATA.n = p->n;
-  p->aDATA.p = p->p;
+  rFileData_SkipToNewLine ( &(pL->t), pL->iLineFeed );
+  return 0;
+}
+
+static UINT rParse_Las_S_DATA_1 ( struct file_state_las * const pL )
+{
+  rFileData_SkipToNewLine ( &(pL->t), pL->iLineFeed );
+  return 0;
+}
+
+static UINT rParse_Las_S_DATA ( struct file_state_las * const pL )
+{
+  rFileData_SkipToNewLine ( &(pL->t), pL->iLineFeed );
+  return 0;
+
+#if 0
+
+  if ( p->iVersion == 2 ) { return rParse_Las_S_DATA_2 ( p ); }
+  if ( p->iVersion == 1 ) { return rParse_Las_S_DATA_1 ( p ); }
+  p->aDATA = p->t;
   p->aDESC.n = 0;
   p->aDESC.p = NULL;
   while ( p->n )
@@ -122,69 +146,70 @@ static UINT rParse_Las_S_DATA ( struct file_state_las * const p )
       p->aDATA.n -= p->aDESC.n+1;
       p->aDESC.n -= p->n;
       p->aLine.n -= p->n;
-      if ( p->iLineFeed == 0x0D0A ) { D7LasSkip(p,2); } else { D7LasSkip(p,1); }
+      if ( p->iLineFeed == 0x0D0A ) { rFileData_Skip(p,2); } else { rFileData_Skip(p,1); }
       ++p->nLine;
       return rParse_Las_S_TrimWhiteSpaces ( p );
     }
     else
     if ( *(p->p) == ':' )
     {
-      D7LasSkip(p,1);
+      rFileData_Skip(p,1);
       p->aDESC.n = p->n;
       p->aDESC.p = p->p;
     }
-    else { D7LasSkip(p,1); }
+    else { rFileData_Skip(p,1); }
   }
   rLog_Error ( L" => LAS(%u): Непредвиденный конец файла (отсутсвует двоеточие)\n", p->nLine );
   return __LINE__;
+#endif
 }
 
-static UINT rParse_Las_S_UNIT ( struct file_state_las * const p )
+static UINT rParse_Las_S_UNIT ( struct file_state_las * const pL )
 {
-  p->aUNIT.n = p->n;
-  p->aUNIT.p = p->p;
+  pL->aUNIT = pL->t;
+  struct file_data_ptr * const p = &(pL->t);
   while ( p->n )
   {
-    if ( *(p->p) == p->iLineFeed || ( p->iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' ) )
+    if ( *(p->p) == pL->iLineFeed || ( pL->iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' ) )
     {
       rLog_Error ( L" => LAS(%u): Непредвиденный конец строки (отсутсвует пробел после точки)\n", p->nLine );
       return __LINE__;
     }
     else
-    if ( *(p->p) == ' ' || *(p->p) == '\t' ) { p->aUNIT.n -= p->n; D7LasSkip(p,1); return rParse_Las_S_DATA ( p ); }
-    else { D7LasSkip(p,1); }
+    if ( *(p->p) == ' ' || *(p->p) == '\t' ) { pL->aUNIT.n -= p->n; rFileData_Skip(p,1); return rParse_Las_S_DATA ( pL ); }
+    else { rFileData_Skip(p,1); }
   }
   rLog_Error ( L" => LAS(%u): Непредвиденный конец файла (отсутсвует пробел после точки)\n", p->nLine );
   return __LINE__;
 }
 
-static UINT rParse_Las_S_MNEM ( struct file_state_las * const p )
+static UINT rParse_Las_S_MNEM ( struct file_state_las * const pL )
 {
-  p->aLine.n = p->n;
-  p->aLine.p = p->p;
-  p->aMNEM.n = p->n;
-  p->aMNEM.p = p->p;
+  pL->aLine = pL->t;
+  pL->aMNEM = pL->t;
+  struct file_data_ptr * const p = &(pL->t);
   // Идём до точки
   while ( p->n )
   {
-    if ( *(p->p) == p->iLineFeed || ( p->iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' ) )
+    if ( *(p->p) == pL->iLineFeed || ( pL->iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' ) )
     {
       rLog_Error ( L" => LAS(%u): Непредвиденный конец строки (отсутсвует точка)\n", p->nLine );
       return __LINE__;
     }
     else
-    if ( *(p->p) == '.' ) { p->aMNEM.n -= p->n; D7LasSkip(p,1); return rParse_Las_S_UNIT ( p ); }
-    else { D7LasSkip(p,1); }
+    if ( *(p->p) == '.' ) { pL->aMNEM.n -= p->n; rFileData_Skip(p,1); return rParse_Las_S_UNIT ( pL ); }
+    else { rFileData_Skip(p,1); }
   }
   rLog_Error ( L" => LAS(%u): Непредвиденный конец файла (отсутсвует точка)\n", p->nLine );
   return __LINE__;
 }
 
 
-static UINT rParse_Las_BeginOfLine ( struct file_state_las * const p )
+static UINT rParse_Las_BeginOfLine ( struct file_state_las * const pL )
 {
+  struct file_data_ptr * const p = &(pL->t);
   P_Begin:
-  rParse_Las_SkipWhiteSpaces ( p );
+  rFileData_SkipWhiteSpaces ( &(pL->t), pL->iLineFeed );
 
   if ( p->n <= 1 )
   {
@@ -197,10 +222,10 @@ static UINT rParse_Las_BeginOfLine ( struct file_state_las * const p )
     switch ( p->p[1] )
     {
       case 'V': case 'W': case 'C': case 'P': case 'O':
-        p->iSection = p->p[1];
-        rParse_Las_SkipToNewLine ( p );
+        pL->iSection = p->p[1];
+        rFileData_SkipToNewLine ( p, pL->iLineFeed );
         goto P_Begin;
-      case 'A': return rParse_Las_SectionA ( p );
+      case 'A': return rParse_Las_SectionA ( pL );
       default:
         rLog_Error ( L" => LAS(%u): Неизвестное название секции\n", p->nLine );
         return __LINE__;
@@ -209,12 +234,12 @@ static UINT rParse_Las_BeginOfLine ( struct file_state_las * const p )
   else
   if ( *(p->p) == '#' )
   {
-    rParse_Las_SkipToNewLine ( p );
+    rFileData_SkipToNewLine ( p, pL->iLineFeed );
     goto P_Begin;
   }
   else
   {
-    const UINT iErr = rParse_Las_S_MNEM ( p );
+    const UINT iErr = rParse_Las_S_MNEM ( pL );
     if ( iErr ) return iErr;
     goto P_Begin;
   }
@@ -227,16 +252,18 @@ static UINT rParse_Las ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const LP
   rLog ( L"Parse_LAS: %-256s ==> %-256s\n", s4wOrigin, s4wPath );
   struct file_state_las _ = { };
   if ( ( iErr = rFS_FileMapOpen ( &(_.fm), s4wPath ) ) ) { goto P_End; }
+  _.iVersion            = 0;
   _.s4wOrigin           = s4wOrigin;
   UINT a1[g7CharMapCount], a2[g7CharMapCount];
   _.iCodePage           = rGetBufCodePage ( _.fm.pData, _.fm.nSize, a1, a2 );
   _.iLineFeed           = rGetBufEndOfLine ( _.fm.pData, _.fm.nSize );
-  _.p                   = _.fm.pData;
-  _.n                   = _.fm.nSize;
-  _.nLine               = 1;
+  _.t.p                 = _.fm.pData;
+  _.t.n                 = _.fm.nSize;
+  _.t.nLine             = 1;
   _.iSection            = 0;
+  _.nWarnings           = 0;
   setlocale ( LC_ALL, g7CharMapCP[_.iCodePage] );
-
+#if 0
   static UINT nFile = 0;
   CHAR str[512];
   sprintf ( str, ".ag47/" );
@@ -270,8 +297,9 @@ static UINT rParse_Las ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const LP
   }
   fwrite ( _.p, 1, _.n, pF );
   fclose ( pF );
-
   goto P_End;
+#endif
+
   rParse_Las_Log ( L"%hc\t%hs\t%hs\t%hs\t%hs\t%s\t%u\r\n",
           '#',
           "FILESETS",
