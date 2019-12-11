@@ -200,14 +200,18 @@ static UINT rFS_NewRandDir_s4w ( const LPWSTR s4w )
   while ( TRUE )
   {
     x = (x * 1103515245U) + 12345U;
-    const UINT i = r4_push_array_s4w_sz ( s4w, wsz, swprintf ( wsz, 11, L"\\%08" TEXT(PRIx32), x ) + 1 );
+    const UINT k = r4_push_array_s4w_sz ( s4w, wsz, swprintf ( wsz, 11, L"\\%08" TEXT(PRIx32), x ) + 1 );
     if ( !CreateDirectory ( s4w, NULL ) )
     {
       const UINT i = GetLastError();
       if ( i != ERROR_ALREADY_EXISTS ) { rLog_Error_WinAPI ( CreateDirectory, GetLastError(), L"%s\n", s4w ); return 0; }
-      else { continue; }
+      else
+      {
+        r4_cut_end_s4w ( s4w, k );
+        continue;
+      }
     }
-    else { return i; }
+    else { return k; }
   }
 }
 

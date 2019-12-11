@@ -75,7 +75,7 @@ UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
   else
   if ( r4_path_ending_s4w_las ( s4wPath ) )
   {
-    iErr = rParse_Las ( s4wPath, s4wOrigin, wszFileName );
+    rParse_Las ( s4wPath, s4wOrigin, wszFileName );
   }
   r4_cut_end_s4w ( s4wOrigin, n );
   return iErr;

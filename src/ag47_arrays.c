@@ -11,8 +11,8 @@
           ^ [-2]        - количество занятых байт
           ^ [-1]        - количество символов
     Вектора с числами
-  s4f     - (FLOAT)                         ( max ~4kT )
-  s4d     - (DOUBLE)                        ( max ~4kT )
+  s4f     - (float)                         ( max ~4kT )
+  s4d     - (double)                        ( max ~4kT )
   s4i     - (INT)                           ( max ~4kT )
   s4u     - (UINT)                          ( max ~4kT )
   s4i8    - (INT8)                          ( max ~4kT )
@@ -43,7 +43,6 @@
           ^ [-2]        - количество элементов
           ^ [-1]        - 0x78abcdef
 */
-typedef double DOUBLE;
 
 /* Структура заголовков векторов */
 struct s4a_head
@@ -98,8 +97,8 @@ struct s4s_head
 #define D4Uni(_p_,_f_,...)              _Generic(_p_,\
     CHAR  *:_f_##_s4a  ,CHAR   const*:_f_##_s4a  ,\
     WCHAR *:_f_##_s4w  ,WCHAR  const*:_f_##_s4w  ,\
-    FLOAT *:_f_##_s4f  ,FLOAT  const*:_f_##_s4f  ,\
-    DOUBLE*:_f_##_s4d  ,DOUBLE const*:_f_##_s4d  ,\
+    float *:_f_##_s4f  ,float  const*:_f_##_s4f  ,\
+    double*:_f_##_s4d  ,double const*:_f_##_s4d  ,\
     INT   *:_f_##_s4i  ,INT    const*:_f_##_s4i  ,\
     UINT  *:_f_##_s4u  ,UINT   const*:_f_##_s4u  ,\
     INT8  *:_f_##_s4i8 ,INT8   const*:_f_##_s4i8 ,\
@@ -121,8 +120,8 @@ struct s4s_head
 #define D4GetPtrHead_s4a(_p_)           D4GetPtrHead__(_p_,struct s4a_head,CHAR  )
 #define D4GetPtrHead_s4w(_p_)           D4GetPtrHead__(_p_,struct s4w_head,WCHAR )
 #define D4GetPtrHead_s4z(_p_)           D4GetPtrHead__(_p_,struct s4z_head,CHAR  )
-#define D4GetPtrHead_s4f(_p_)           D4GetPtrHead__(_p_,struct s4p_head,FLOAT )
-#define D4GetPtrHead_s4d(_p_)           D4GetPtrHead__(_p_,struct s4p_head,DOUBLE)
+#define D4GetPtrHead_s4f(_p_)           D4GetPtrHead__(_p_,struct s4p_head,float )
+#define D4GetPtrHead_s4d(_p_)           D4GetPtrHead__(_p_,struct s4p_head,double)
 #define D4GetPtrHead_s4i(_p_)           D4GetPtrHead__(_p_,struct s4p_head,INT   )
 #define D4GetPtrHead_s4u(_p_)           D4GetPtrHead__(_p_,struct s4p_head,UINT  )
 #define D4GetPtrHead_s4i8(_p_)          D4GetPtrHead__(_p_,struct s4p_head,INT8  )
@@ -148,8 +147,8 @@ struct s4s_head
 #define D4GetPtrBody_s4a(_p_)           D4GetPtrBody__(_p_,struct s4a_head,CHAR  )
 #define D4GetPtrBody_s4w(_p_)           D4GetPtrBody__(_p_,struct s4w_head,WCHAR )
 #define D4GetPtrBody_s4z(_p_)           D4GetPtrBody__(_p_,struct s4z_head,CHAR  )
-#define D4GetPtrBody_s4f(_p_)           D4GetPtrBody__(_p_,struct s4p_head,FLOAT )
-#define D4GetPtrBody_s4d(_p_)           D4GetPtrBody__(_p_,struct s4p_head,DOUBLE)
+#define D4GetPtrBody_s4f(_p_)           D4GetPtrBody__(_p_,struct s4p_head,float )
+#define D4GetPtrBody_s4d(_p_)           D4GetPtrBody__(_p_,struct s4p_head,double)
 #define D4GetPtrBody_s4i(_p_)           D4GetPtrBody__(_p_,struct s4p_head,INT   )
 #define D4GetPtrBody_s4u(_p_)           D4GetPtrBody__(_p_,struct s4p_head,UINT  )
 #define D4GetPtrBody_s4i8(_p_)          D4GetPtrBody__(_p_,struct s4p_head,INT8  )
@@ -173,8 +172,8 @@ struct s4s_head
 #define r4_alloca_s4a(_n_)              r4_alloca__(struct s4a_head,CHAR  ,_n_,0)
 #define r4_alloca_s4w(_n_)              r4_alloca__(struct s4w_head,WCHAR ,_n_,0)
 #define r4_alloca_s4z(_n_)              r4_alloca__(struct s4z_head,CHAR  ,_n_,0)
-#define r4_alloca_s4f(_n_)              r4_alloca__(struct s4p_head,FLOAT ,_n_,0)
-#define r4_alloca_s4d(_n_)              r4_alloca__(struct s4p_head,DOUBLE,_n_,0)
+#define r4_alloca_s4f(_n_)              r4_alloca__(struct s4p_head,float ,_n_,0)
+#define r4_alloca_s4d(_n_)              r4_alloca__(struct s4p_head,double,_n_,0)
 #define r4_alloca_s4i(_n_)              r4_alloca__(struct s4p_head,INT   ,_n_,0)
 #define r4_alloca_s4u(_n_)              r4_alloca__(struct s4p_head,UINT  ,_n_,0)
 #define r4_alloca_s4i8(_n_)             r4_alloca__(struct s4p_head,INT8  ,_n_,0)
@@ -200,8 +199,8 @@ struct s4s_head
 #define r4_alloca_init_s4a(_s_)         r4_alloca_init__(_s_,struct s4a_head,CHAR  ,1)
 #define r4_alloca_init_s4w(_s_)         r4_alloca_init__(_s_,struct s4w_head,WCHAR ,1)
 #define r4_alloca_init_s4z(_s_)         r4_alloca_init__(_s_,struct s4z_head,CHAR  ,1)
-#define r4_alloca_init_s4f(_a_)         r4_alloca_init__(_a_,struct s4p_head,FLOAT ,0)
-#define r4_alloca_init_s4d(_a_)         r4_alloca_init__(_a_,struct s4p_head,DOUBLE,0)
+#define r4_alloca_init_s4f(_a_)         r4_alloca_init__(_a_,struct s4p_head,float ,0)
+#define r4_alloca_init_s4d(_a_)         r4_alloca_init__(_a_,struct s4p_head,double,0)
 #define r4_alloca_init_s4i(_a_)         r4_alloca_init__(_a_,struct s4p_head,INT   ,0)
 #define r4_alloca_init_s4u(_a_)         r4_alloca_init__(_a_,struct s4p_head,UINT  ,0)
 #define r4_alloca_init_s4i8(_a_)        r4_alloca_init__(_a_,struct s4p_head,INT8  ,0)
@@ -229,8 +228,8 @@ struct s4s_head
 #define r4_alloca_init_ex_s4a(_s_,_n_)          r4_alloca_init_ex__(_s_,_n_,struct s4a_head,CHAR  ,1)
 #define r4_alloca_init_ex_s4w(_s_,_n_)          r4_alloca_init_ex__(_s_,_n_,struct s4w_head,WCHAR ,1)
 #define r4_alloca_init_ex_s4z(_s_,_n_)          r4_alloca_init_ex__(_s_,_n_,struct s4z_head,CHAR  ,1)
-#define r4_alloca_init_ex_s4f(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,FLOAT ,0)
-#define r4_alloca_init_ex_s4d(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,DOUBLE,0)
+#define r4_alloca_init_ex_s4f(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,float ,0)
+#define r4_alloca_init_ex_s4d(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,double,0)
 #define r4_alloca_init_ex_s4i(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,INT   ,0)
 #define r4_alloca_init_ex_s4u(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,UINT  ,0)
 #define r4_alloca_init_ex_s4i8(_a_,_n_)         r4_alloca_init_ex__(_a_,_n_,struct s4p_head,INT8  ,0)
@@ -255,8 +254,8 @@ struct s4s_head
 #define r4_malloc_s4a(_n_)              r4_malloc__(struct s4a_head,CHAR  ,_n_,0)
 #define r4_malloc_s4w(_n_)              r4_malloc__(struct s4w_head,WCHAR ,_n_,0)
 #define r4_malloc_s4z(_n_)              r4_malloc__(struct s4z_head,CHAR  ,_n_,0)
-#define r4_malloc_s4f(_n_)              r4_malloc__(struct s4p_head,FLOAT ,_n_,0)
-#define r4_malloc_s4d(_n_)              r4_malloc__(struct s4p_head,DOUBLE,_n_,0)
+#define r4_malloc_s4f(_n_)              r4_malloc__(struct s4p_head,float ,_n_,0)
+#define r4_malloc_s4d(_n_)              r4_malloc__(struct s4p_head,double,_n_,0)
 #define r4_malloc_s4i(_n_)              r4_malloc__(struct s4p_head,INT   ,_n_,0)
 #define r4_malloc_s4u(_n_)              r4_malloc__(struct s4p_head,UINT  ,_n_,0)
 #define r4_malloc_s4i8(_n_)             r4_malloc__(struct s4p_head,INT8  ,_n_,0)
@@ -282,8 +281,8 @@ struct s4s_head
 #define r4_malloc_init_s4a(_s_)         r4_malloc_init__(_s_,struct s4a_head,CHAR  ,1)
 #define r4_malloc_init_s4w(_s_)         r4_malloc_init__(_s_,struct s4w_head,WCHAR ,1)
 #define r4_malloc_init_s4z(_s_)         r4_malloc_init__(_s_,struct s4z_head,CHAR  ,1)
-#define r4_malloc_init_s4f(_a_)         r4_malloc_init__(_a_,struct s4p_head,FLOAT ,0)
-#define r4_malloc_init_s4d(_a_)         r4_malloc_init__(_a_,struct s4p_head,DOUBLE,0)
+#define r4_malloc_init_s4f(_a_)         r4_malloc_init__(_a_,struct s4p_head,float ,0)
+#define r4_malloc_init_s4d(_a_)         r4_malloc_init__(_a_,struct s4p_head,double,0)
 #define r4_malloc_init_s4i(_a_)         r4_malloc_init__(_a_,struct s4p_head,INT   ,0)
 #define r4_malloc_init_s4u(_a_)         r4_malloc_init__(_a_,struct s4p_head,UINT  ,0)
 #define r4_malloc_init_s4i8(_a_)        r4_malloc_init__(_a_,struct s4p_head,INT8  ,0)
@@ -309,8 +308,8 @@ struct s4s_head
 #define r4_free_s4a(_p_)                r4_free__(_p_,struct s4a_head,CHAR  )
 #define r4_free_s4w(_p_)                r4_free__(_p_,struct s4w_head,WCHAR )
 #define r4_free_s4z(_p_)                r4_free__(_p_,struct s4z_head,CHAR  )
-#define r4_free_s4f(_p_)                r4_free__(_p_,struct s4p_head,FLOAT )
-#define r4_free_s4d(_p_)                r4_free__(_p_,struct s4p_head,DOUBLE)
+#define r4_free_s4f(_p_)                r4_free__(_p_,struct s4p_head,float )
+#define r4_free_s4d(_p_)                r4_free__(_p_,struct s4p_head,double)
 #define r4_free_s4i(_p_)                r4_free__(_p_,struct s4p_head,INT   )
 #define r4_free_s4u(_p_)                r4_free__(_p_,struct s4p_head,UINT  )
 #define r4_free_s4i8(_p_)               r4_free__(_p_,struct s4p_head,INT8  )
@@ -443,7 +442,7 @@ static UINT r4_cut_end_s4w ( const LPWSTR s4, const UINT n )
   struct s4w_head * const h = D4GetPtrHead_s4w(s4);
   if ( h->count < n )
   {
-    rLog_Error ( L"\t==> Невозможно обрезать строку за пределами строки [%s] (%u/%u)\n", n, h->count );
+    rLog_Error ( L"\t==> Невозможно обрезать строку за пределами строки [%s] (%u/%u)\n", s4, n, h->count );
     return h->count;
   }
   else
