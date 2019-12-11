@@ -1,0 +1,20 @@
+﻿
+
+  PATH_IN  = [
+    "t_data\2007г/2201/2201/las",
+    //".\t_data\2007г",
+    //".\t_data\2012г",
+    //".\t_data\2012г\2254",
+    ".\t_data"      ,
+  ];
+
+ /* PATH_OUT =
+    ".\t_data";
+*/
+  FORMAT_AR=[".zip",".rar"];
+
+  //RECREATE;
+
+  //RUN_TREE   ;
+
+  //RUN_PARSE;
