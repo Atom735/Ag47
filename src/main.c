@@ -13,6 +13,7 @@
 static LPWSTR s4wPathOut = NULL;
 static LPWSTR s4wPathOutTempDir = NULL;
 static LPWSTR s4wPathOutLogsDir = NULL;
+static LPWSTR s4wPathOutLasDir = NULL;
 static _locale_t g_locale_C = NULL;
 
 
@@ -42,6 +43,9 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
   s4wPathOutLogsDir = r4_alloca_s4w ( kPathMax );
   r4_init_s4w_s4w ( s4wPathOutLogsDir, s4wPathOut );
   rFS_AddDir ( s4wPathOutLogsDir, L"\\.logs", 0 );
+  s4wPathOutLasDir = r4_alloca_s4w ( kPathMax );
+  r4_init_s4w_s4w ( s4wPathOutLasDir, s4wPathOut );
+  rFS_AddDir ( s4wPathOutLasDir, L"\\las", 0 );
 
 
   // const LPWSTR s4wPathIn = r4_alloca_init_ex_s4w ( L"\\\\?\\UNC\\NAS\\Public", kPathMax );

@@ -41,6 +41,7 @@ struct file_state_las
   UINT                  iVersion;       // Версия LAS файла
   BOOL                  bWrap;          // Перенос данных
   LPCWSTR               s4wOrigin;      // Путь к оригиналу файла
+  LPCWSTR               wszFileName;    // Название файла
   UINT                  iCodePage;      // Номер кодировки
   UINT                  iLineFeed;      // Символ перехода на новую строку
   BYTE                  iSection;       // В какой секции сейчас находимся
@@ -59,16 +60,74 @@ struct file_state_las
       BOOL b;
     };
   }       v_VERS, v_WRAP,
-          w_STRT, w_STOP, w_STEP, w_NULL;
+          w_STRT, w_STOP, w_STEP, w_NULL,
+          w_WELL;
   struct las_c_data    *pA_C;           // Все линии секции C
 
 };
 
 
+INT _rParse_Las_ArraySortCMP ( struct las_line_data const * const p1, struct las_line_data const * const p2 )
+{
+  if ( p1->iSection < p2->iSection) { return -1; }
+  if ( p1->iSection > p2->iSection) { return +1; }
+  LPCSTR q1 = (LPCSTR)(p1->aMNEM.p);
+  LPCSTR q2 = (LPCSTR)(p2->aMNEM.p);
+  UINT n1 = p1->aMNEM.n;
+  UINT n2 = p2->aMNEM.n;
+  while ( n1 && n2 )
+  {
+    if ( tolower(*q1) == tolower(*q2) ) { ++q1; ++q2; --n1; --n2; }
+    else { return tolower(*q1) - tolower(*q2); }
+  }
+  return n1 - n2;
+}
+
+static UINT rParse_Las_ArraySort ( struct las_line_data * const p )
+{
+  qsort ( p, r4_get_count_s4s(p), sizeof(struct las_line_data), (int (*)(const void *, const void *))_rParse_Las_ArraySortCMP );
+  return 0;
+}
+
+static UINT rParse_Las_Save ( struct file_state_las * const pL )
+{
+  const LPWSTR s4w = r4_alloca_s4w(kPathMax);
+  r4_push_path_s4w_s4w ( s4w, s4wPathOutLasDir );
+  for ( UINT i = 0; i <= 999; ++i )
+  {
+    swprintf ( s4w+r4_get_count_s4w(s4w), kPathMax-r4_get_count_s4w(s4w),
+            L"\\%.*hs_%s_[%03u].LAS",
+            pL->w_WELL._.n, pL->w_WELL._.p,
+            pL->wszFileName, i );
+    FILE * const pf = _wfopen ( s4w, L"rb" );
+    if ( pf ) { fclose ( pf ); } else { break; }
+  }
+  FILE * const pf = _wfopen ( s4w, L"wb" );
+  if ( pf )
+  {
+    fwrite ( pL->fm.pData, 1, pL->fm.nSize, pf );
+    fclose ( pf );
+  }
+  else
+  {
+    rLog_Error ( L"Невозможно открыть файл для записи [%s]\n", s4w );
+    return __LINE__;
+  }
+  return 0;
+}
+
+static UINT rParse_Las_End ( struct file_state_las * const pL )
+{
+  rParse_Las_ArraySort ( pL->pArray );
+  for ( UINT i = 0; i < r4_get_count_s4s(pL->pArray); ++i )
+  {
+    // rLog ( L"  |] %c %.*hs\n", pL->pArray[i].iSection, pL->pArray[i].aMNEM.n, pL->pArray[i].aMNEM.p );
+  }
+  return rParse_Las_Save ( pL );
+}
 
 static UINT rParse_Las_SectionA ( struct file_state_las * const pL )
 {
-
   struct file_data_ptr * const p = &(pL->t);
   rFileData_SkipToNewLine ( p, pL->iLineFeed );
   rFileData_SkipWhiteSpaces( p, pL->iLineFeed );
@@ -174,8 +233,7 @@ static UINT rParse_Las_SectionA ( struct file_state_las * const pL )
     rLog ( L"  ==> [%u]: %-16.*hs % 10.4f % 10.4f\n",
         i, pL->pA_C[i].aMNEM.n, pL->pA_C[i].aMNEM.p, pL->pA_C[i].fSTRT, pL->pA_C[i].fSTOP );
   }
-
-  return 0;
+  return rParse_Las_End ( pL );
 }
 
 static UINT rParse_Las_S_DATA_2 ( struct file_state_las * const pL )
@@ -351,6 +409,10 @@ static UINT rParse_Las_S_W ( struct file_state_las * const pL )
     {
       rLog_Error ( L" => LAS(%u): Некооректное значение версии файла\n", pL->t.nLine );
       return __LINE__;
+    }
+    if ( rFileData_Cmp ( aMNEM, "WELL" ) )
+    {
+      pL->w_WELL._ = *aDATA;
     }
   }
   r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'W',
@@ -530,6 +592,7 @@ static UINT rParse_Las ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const LP
   if ( ( iErr = rFS_FileMapOpen ( &(_.fm), s4wPath ) ) ) { goto P_End; }
   _.iVersion            = 0;
   _.s4wOrigin           = s4wOrigin;
+  _.wszFileName         = wszFileName;
   UINT a1[g7CharMapCount], a2[g7CharMapCount];
   _.iCodePage           = rGetBufCodePage ( _.fm.pData, _.fm.nSize, a1, a2 );
   _.iLineFeed           = rGetBufEndOfLine ( _.fm.pData, _.fm.nSize );
