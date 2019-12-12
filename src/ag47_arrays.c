@@ -136,7 +136,7 @@ struct s4s_head
 #define D4GetPtrHead_ss4w(_p_)          D4GetPtrHead__(_p_,struct s4p_head,LPWSTR)
 #define D4GetPtrHead_ss4z(_p_)          D4GetPtrHead__(_p_,struct s4p_head,LPSTR )
 #define D4GetPtrHead_s4p(_p_)           D4GetPtrHead__(_p_,struct s4p_head,LPVOID)
-#define D4GetPtrHead_s4s(_p_,_b_)       D4GetPtrHead__(_p_,struct s4s_head,_b_   )
+#define D4GetPtrHead_s4s(_p_)           ((struct s4s_head*)(((LPVOID)(_p_))-sizeof(struct s4s_head)))
 #define D4GetPtrHead_Uni(_p_)           D4Uni(_p_,D4GetPtrHead,_p_)
 
 /*
@@ -163,7 +163,7 @@ struct s4s_head
 #define D4GetPtrBody_ss4w(_p_)          D4GetPtrBody__(_p_,struct s4p_head,LPWSTR)
 #define D4GetPtrBody_ss4z(_p_)          D4GetPtrBody__(_p_,struct s4p_head,LPSTR )
 #define D4GetPtrBody_s4p(_p_)           D4GetPtrBody__(_p_,struct s4p_head,LPVOID)
-#define D4GetPtrBody_s4s(_p_,_b_)       D4GetPtrBody__(_p_,struct s4s_head,_b_   )
+#define D4GetPtrBody_s4s(_p_)           ((((LPVOID)(_p_))+sizeof(struct s4s_head)))
 /*
   Выделение места на стеке
   _n_ -- Количество элементов
@@ -188,7 +188,7 @@ struct s4s_head
 #define r4_alloca_ss4w(_n_)             r4_alloca__(struct s4p_head,LPWSTR,_n_,0)
 #define r4_alloca_ss4z(_n_)             r4_alloca__(struct s4p_head,LPSTR ,_n_,0)
 #define r4_alloca_s4p(_n_)              r4_alloca__(struct s4p_head,LPVOID,_n_,0)
-#define r4_alloca_s4s(_n_,_b_)          D4GetPtrBody_s4s(memcpy(alloca(sizeof(struct s4s_head)+(sizeof(_b_)*_n_)),&((struct s4s_head){.memsz=_n_,.count=0,.elemsz=sizeof(_b_)}),sizeof(struct s4s_head)),_b_)
+//#define r4_alloca_s4s(_n_,_b_)          D4GetPtrBody_s4s(memcpy(alloca(sizeof(struct s4s_head)+(sizeof(_b_)*_n_)),&((struct s4s_head){.memsz=_n_,.count=0,.elemsz=sizeof(_b_)}),sizeof(struct s4s_head)),_b_)
 /*
   Выделение места на стеке с инициализацией
   _s_ -- Строка
@@ -215,7 +215,7 @@ struct s4s_head
 #define r4_alloca_init_ss4w(_a_)        r4_alloca_init__(_a_,struct s4p_head,LPWSTR,0)
 #define r4_alloca_init_ss4z(_a_)        r4_alloca_init__(_a_,struct s4p_head,LPSTR ,0)
 #define r4_alloca_init_s4p(_a_)         r4_alloca_init__(_a_,struct s4p_head,LPVOID,0)
-#define r4_alloca_init_s4s(_a_,_b_)     r4_alloca_init__(_a_,struct s4p_head,_b_   ,0)
+//#define r4_alloca_init_s4s(_a_,_b_)     r4_alloca_init__(_a_,struct s4s_head,_b_   ,0)
 #define r4_alloca_init_Uni(_p_)         D4Uni(_p_,r4_alloca_init,_p_)
 /*
   Выделение места на стеке c указаным количеством элементов
@@ -244,33 +244,34 @@ struct s4s_head
 #define r4_alloca_init_ex_ss4w(_a_,_n_)         r4_alloca_init_ex__(_a_,_n_,struct s4p_head,LPWSTR,0)
 #define r4_alloca_init_ex_ss4z(_a_,_n_)         r4_alloca_init_ex__(_a_,_n_,struct s4p_head,LPSTR ,0)
 #define r4_alloca_init_ex_s4p(_a_,_n_)          r4_alloca_init_ex__(_a_,_n_,struct s4p_head,LPVOID,0)
-#define r4_alloca_init_ex_s4s(_a_,_n_,_b_)      r4_alloca_init_ex__(_a_,_n_,struct s4p_head,_b_   ,0)
+//#define r4_alloca_init_ex_s4s(_a_,_n_,_b_)      r4_alloca_init_ex__(_a_,_n_,struct s4s_head,_b_   ,0)
 #define r4_alloca_init_ex_Uni(_p_,_n_)          D4Uni(_p_,r4_alloca_init_ex,_p_,_n_)
 /*
   Выделение места на стеке
   _n_ -- Количество элементов
+  _s_ -- размер структуры
 */
-#define r4_malloc__(_h_,_b_,_n_,_c_)    D4GetPtrBody__(memcpy(malloc(sizeof(_h_)+(sizeof(_b_)*_n_)),&((_h_){.memsz=_n_,.count=_c_}),sizeof(_h_)),_h_,_b_)
-#define r4_malloc_s4a(_n_)              r4_malloc__(struct s4a_head,CHAR  ,_n_,0)
-#define r4_malloc_s4w(_n_)              r4_malloc__(struct s4w_head,WCHAR ,_n_,0)
-#define r4_malloc_s4z(_n_)              r4_malloc__(struct s4z_head,CHAR  ,_n_,0)
-#define r4_malloc_s4f(_n_)              r4_malloc__(struct s4p_head,float ,_n_,0)
-#define r4_malloc_s4d(_n_)              r4_malloc__(struct s4p_head,double,_n_,0)
-#define r4_malloc_s4i(_n_)              r4_malloc__(struct s4p_head,INT   ,_n_,0)
-#define r4_malloc_s4u(_n_)              r4_malloc__(struct s4p_head,UINT  ,_n_,0)
-#define r4_malloc_s4i8(_n_)             r4_malloc__(struct s4p_head,INT8  ,_n_,0)
-#define r4_malloc_s4u8(_n_)             r4_malloc__(struct s4p_head,UINT8 ,_n_,0)
-#define r4_malloc_s4i16(_n_)            r4_malloc__(struct s4p_head,INT16 ,_n_,0)
-#define r4_malloc_s4u16(_n_)            r4_malloc__(struct s4p_head,UINT16,_n_,0)
-#define r4_malloc_s4i32(_n_)            r4_malloc__(struct s4p_head,INT32 ,_n_,0)
-#define r4_malloc_s4u32(_n_)            r4_malloc__(struct s4p_head,UINT32,_n_,0)
-#define r4_malloc_s4i64(_n_)            r4_malloc__(struct s4p_head,INT64 ,_n_,0)
-#define r4_malloc_s4u64(_n_)            r4_malloc__(struct s4p_head,UINT64,_n_,0)
-#define r4_malloc_ss4a(_n_)             r4_malloc__(struct s4p_head,LPSTR ,_n_,0)
-#define r4_malloc_ss4w(_n_)             r4_malloc__(struct s4p_head,LPWSTR,_n_,0)
-#define r4_malloc_ss4z(_n_)             r4_malloc__(struct s4p_head,LPSTR ,_n_,0)
-#define r4_malloc_s4p(_n_)              r4_malloc__(struct s4p_head,LPVOID,_n_,0)
-#define r4_malloc_s4s(_n_,_b_)          D4GetPtrBody_s4s(memcpy(malloc(sizeof(struct s4s_head)+(sizeof(_b_)*_n_)),&((struct s4s_head){.memsz=_n_,.count=0,.elemsz=sizeof(_b_)}),sizeof(struct s4s_head)),_b_)
+#define r4_malloc__(_h_,_b_,_n_)        D4GetPtrBody__(memcpy(malloc(sizeof(_h_)+(sizeof(_b_)*_n_)),&((_h_){.memsz=_n_,.count=0}),sizeof(_h_)),_h_,_b_)
+#define r4_malloc_s4a(_n_)              r4_malloc__(struct s4a_head,CHAR  ,_n_)
+#define r4_malloc_s4w(_n_)              r4_malloc__(struct s4w_head,WCHAR ,_n_)
+#define r4_malloc_s4z(_n_)              r4_malloc__(struct s4z_head,CHAR  ,_n_)
+#define r4_malloc_s4f(_n_)              r4_malloc__(struct s4p_head,float ,_n_)
+#define r4_malloc_s4d(_n_)              r4_malloc__(struct s4p_head,double,_n_)
+#define r4_malloc_s4i(_n_)              r4_malloc__(struct s4p_head,INT   ,_n_)
+#define r4_malloc_s4u(_n_)              r4_malloc__(struct s4p_head,UINT  ,_n_)
+#define r4_malloc_s4i8(_n_)             r4_malloc__(struct s4p_head,INT8  ,_n_)
+#define r4_malloc_s4u8(_n_)             r4_malloc__(struct s4p_head,UINT8 ,_n_)
+#define r4_malloc_s4i16(_n_)            r4_malloc__(struct s4p_head,INT16 ,_n_)
+#define r4_malloc_s4u16(_n_)            r4_malloc__(struct s4p_head,UINT16,_n_)
+#define r4_malloc_s4i32(_n_)            r4_malloc__(struct s4p_head,INT32 ,_n_)
+#define r4_malloc_s4u32(_n_)            r4_malloc__(struct s4p_head,UINT32,_n_)
+#define r4_malloc_s4i64(_n_)            r4_malloc__(struct s4p_head,INT64 ,_n_)
+#define r4_malloc_s4u64(_n_)            r4_malloc__(struct s4p_head,UINT64,_n_)
+#define r4_malloc_ss4a(_n_)             r4_malloc__(struct s4p_head,LPSTR ,_n_)
+#define r4_malloc_ss4w(_n_)             r4_malloc__(struct s4p_head,LPWSTR,_n_)
+#define r4_malloc_ss4z(_n_)             r4_malloc__(struct s4p_head,LPSTR ,_n_)
+#define r4_malloc_s4p(_n_)              r4_malloc__(struct s4p_head,LPVOID,_n_)
+#define r4_malloc_s4s(_n_,_s_)          D4GetPtrBody_s4s(memcpy(malloc(sizeof(struct s4s_head)+(_s_*_n_)),&((struct s4s_head){.memsz=_n_,.count=0,.elemsz=_s_}),sizeof(struct s4s_head)))
 /*
   Выделение места на стеке с инициализацией
   _s_ -- Строка
@@ -297,7 +298,7 @@ struct s4s_head
 #define r4_malloc_init_ss4w(_a_)        r4_malloc_init__(_a_,struct s4p_head,LPWSTR,0)
 #define r4_malloc_init_ss4z(_a_)        r4_malloc_init__(_a_,struct s4p_head,LPSTR ,0)
 #define r4_malloc_init_s4p(_a_)         r4_malloc_init__(_a_,struct s4p_head,LPVOID,0)
-#define r4_malloc_init_s4s(_a_,_b_)     r4_malloc_init__(_a_,struct s4p_head,_b_   ,0)
+//#define r4_malloc_init_s4s(_a_,_b_)     r4_malloc_init__(_a_,struct s4s_head,_b_   ,0)
 #define r4_malloc_init_Uni(_p_)         D4Uni(_p_,r4_malloc_init,_p_)
 /*
   Освобождение памяти после malloc
@@ -324,7 +325,7 @@ struct s4s_head
 #define r4_free_ss4w(_p_)               r4_free__(_p_,struct s4p_head,LPWSTR)
 #define r4_free_ss4z(_p_)               r4_free__(_p_,struct s4p_head,LPSTR )
 #define r4_free_s4p(_p_)                r4_free__(_p_,struct s4p_head,LPVOID)
-#define r4_free_s4s(_p_,_b_)            r4_free__(_a_,struct s4p_head,_b_)
+#define r4_free_s4s(_p_)                free(D4GetPtrHead_s4s(_p_))
 #define r4_free_Uni(_p_)                D4Uni(_p_,r4_free,_p_)
 /*
   Получение количества элементов (исключая нулевой элемент для строк)
@@ -379,6 +380,24 @@ struct s4s_head
 #define r4_get_memsz_s4s(_p_)           r4_get_memsz__(s4s  ,_p_)
 #define r4_get_memsz_Uni(_p_)           D4Uni(_p_,r4_get_memsz,_p_)
 /*
+  Выделяет место в куче и копирует туда вектор
+*/
+static VOID * r4_malloc_copy_s4s ( VOID const * const p, UINT n )
+{
+  struct s4s_head const * const pH = D4GetPtrHead_s4s(p);
+  if ( n <= pH->count ) { n = pH->count * 2; }
+  VOID * const pNew = r4_malloc_s4s ( n, pH->elemsz );
+  r4_get_count_s4s ( pNew ) = pH->count;
+  memcpy ( pNew, p, pH->count * pH->elemsz );
+  return pNew;
+}
+static VOID * r4_realloc_s4s ( VOID * const p, UINT n )
+{
+  VOID * const pNew = r4_malloc_copy_s4s ( p, n );
+  r4_free_s4s ( p );
+  return pNew;
+}
+/*
   Цикл по всем элементам массива
   _p_ -- вектор
   _i_ -- название переменной счётчика
@@ -420,7 +439,7 @@ static UINT r4_push_array_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
   struct s4w_head * const h = D4GetPtrHead_s4w(s4);
   if ( h->memsz < h->count + n )
   {
-    rLog_Error ( L"\t==> Нехватает места для объединения строк [%s] и [%s]\n" );
+    rLog_Error ( L"\t==> Нехватает места для объединения строк [%s] и [%s]\n", s4, wsz );
     return h->count;
   }
   else
@@ -432,6 +451,23 @@ static UINT r4_push_array_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
   }
 }
 #define r4_push_array_s4w_s4w(_p_,_w_) r4_push_array_s4w_sz(_p_,_w_,r4_get_count_s4w(_w_)+1)
+
+static UINT r4_add_array_s4s ( VOID * const s4s, VOID const * const pElement, const UINT nCount )
+{
+  struct s4s_head * const pH = D4GetPtrHead_s4s(s4s);
+  if ( pH->memsz < pH->count + nCount )
+  {
+    return r4_add_array_s4s ( r4_realloc_s4s ( s4s, pH->memsz*2 ), pElement, nCount );
+  }
+  else
+  {
+    memcpy ( s4s + (pH->count*pH->elemsz), pElement, nCount*pH->elemsz );
+    const UINT u = pH->count;
+    pH->count += nCount;
+    return u;
+  }
+}
+
 /*
   Обрезает вектор с конца на указанный размер
   s4                    -- вектор
