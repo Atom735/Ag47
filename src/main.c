@@ -9,6 +9,8 @@
 #include <wchar.h>
 #include <wctype.h>
 
+#include <libxml/parser.h>
+
 #define kPathMax PATH_MAX
 static LPWSTR s4wPathOut = NULL;
 static LPWSTR s4wPathOutTempDir = NULL;
@@ -23,6 +25,7 @@ static _locale_t g_locale_C = NULL;
 #include "ag47_arrays.c"
 #include "ag47_settings.c"
 #include "ag47_fs.c"
+#include "ag47_parse_docx.c"
 #include "ag47_parse_las.c"
 #include "ag47_parse.c"
 
@@ -56,6 +59,8 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
   const UINT iErr = rParse_Tree ( s4wPathIn, s4wPathOrigin );
 
   rLog ( NULL );
+  rParse_Las_Log ( NULL );
+
   _free_locale ( g_locale_C );
   rLocalsFree ( );
   return iErr;

@@ -133,15 +133,14 @@ static UINT rParse_Las_SectionA ( struct file_state_las * const pL )
   rFileData_SkipWhiteSpaces( p, pL->iLineFeed );
   const UINT nCC = r4_get_count_s4s ( pL->pA_C ); // Количество данных в строке
 
-  rLog ( L"  ==> STRT: %f\n", pL->w_STRT.d );
-  rLog ( L"  ==> STOP: %f\n", pL->w_STOP.d );
-  rLog ( L"  ==> STEP: %f\n", pL->w_STEP.d );
-  rLog ( L"  ==> NULL: %f\n", pL->w_NULL.d );
-  rLog ( L"  ==> METHODS: %u\n", nCC );
+  // rLog ( L"  ==> STRT: %f\n", pL->w_STRT.d );
+  // rLog ( L"  ==> STOP: %f\n", pL->w_STOP.d );
+  // rLog ( L"  ==> STEP: %f\n", pL->w_STEP.d );
+  // rLog ( L"  ==> NULL: %f\n", pL->w_NULL.d );
+  // rLog ( L"  ==> METHODS: %u\n", nCC );
   for ( UINT i = 0; i < nCC; ++i )
   {
-    rLog ( L"  ==> [%u]: %.*hs\n", i, pL->pA_C[i].aMNEM.n, pL->pA_C[i].aMNEM.p );
-
+    // rLog ( L"  ==> [%u]: %.*hs\n", i, pL->pA_C[i].aMNEM.n, pL->pA_C[i].aMNEM.p );
   }
   for ( UINT i = 0; i < nCC; ++i )
   {
@@ -230,8 +229,8 @@ static UINT rParse_Las_SectionA ( struct file_state_las * const pL )
 
   for ( UINT i = 0; i < nCC; ++i )
   {
-    rLog ( L"  ==> [%u]: %-16.*hs % 10.4f % 10.4f\n",
-        i, pL->pA_C[i].aMNEM.n, pL->pA_C[i].aMNEM.p, pL->pA_C[i].fSTRT, pL->pA_C[i].fSTOP );
+    // rLog ( L"  ==> [%u]: %-16.*hs % 10.4f % 10.4f\n",
+    //     i, pL->pA_C[i].aMNEM.n, pL->pA_C[i].aMNEM.p, pL->pA_C[i].fSTRT, pL->pA_C[i].fSTOP );
   }
   return rParse_Las_End ( pL );
 }
