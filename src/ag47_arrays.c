@@ -397,6 +397,23 @@ static VOID * r4_realloc_s4s ( VOID * const p, UINT n )
   r4_free_s4s ( p );
   return pNew;
 }
+
+static LPVOID * r4_malloc_copy_s4p ( LPVOID const * const p, UINT n )
+{
+  struct s4p_head const * const pH = D4GetPtrHead_s4p(p);
+  if ( n <= pH->count ) { n = pH->count * 2; }
+  LPVOID * const pNew = r4_malloc_s4p ( n );
+  r4_get_count_s4p ( pNew ) = pH->count;
+  memcpy ( pNew, p, pH->count * sizeof(LPVOID) );
+  return pNew;
+}
+static LPVOID * r4_realloc_s4p ( LPVOID * const p, UINT n )
+{
+  printf ( "Realloc (%p,%u)\n", p, n );
+  VOID * const pNew = r4_malloc_copy_s4p ( p, n );
+  r4_free_s4p ( p );
+  return pNew;
+}
 /*
   Цикл по всем элементам массива
   _p_ -- вектор
@@ -467,6 +484,8 @@ static UINT r4_add_array_s4s ( VOID * const s4s, VOID const * const pElement, co
     return u;
   }
 }
+
+
 
 /*
   Обрезает вектор с конца на указанный размер
@@ -576,7 +595,13 @@ static BOOL r4_path_ending_s4w_las ( const LPCWSTR s4w )
 }
 static BOOL r4_path_ending_s4w_txt ( const LPCWSTR s4w )
 {
-  const LPWSTR w = r4_alloca_init_ex_s4w ( L".txt", 8 );
+  const LPWSTR w = r4_alloca_init_ex_s4w ( L".txt", 5 );
+  if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
+  return FALSE;
+}
+static BOOL r4_path_ending_s4w_dbf ( const LPCWSTR s4w )
+{
+  const LPWSTR w = r4_alloca_init_ex_s4w ( L".dbf", 5 );
   if ( r4_path_ending_s4w_s4w ( s4w, w ) ) return TRUE;
   return FALSE;
 }

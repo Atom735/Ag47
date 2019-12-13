@@ -1,10 +1,6 @@
 ﻿
 
-static UINT rParse_Txt ( const LPCWSTR s4wPath, const LPCWSTR s4wOrigin, const LPCWSTR wszFileName )
-{
-  rLog ( L"Parse_TXT: %-256s ==> %-256s\n", s4wOrigin, s4wPath );
-  return 0;
-}
+
 
 
 UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
@@ -47,7 +43,7 @@ UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
   if ( r4_path_ending_s4w_doc ( s4wPath ) )
   {
     struct file_map fm;
-    rFS_FileMapOpen ( &fm, s4wPath );
+    if ( rFS_FileMapOpen ( &fm, s4wPath ) ) { goto P_End; }
     if ( fm.nSize < 8 ) { rFS_FileMapClose ( &fm ); goto P_End; }
     if ( memcmp ( fm.pData, ((BYTE[]){0xD0,0xCF,0x11,0xE0,0xA1,0xB1,0x1A,0xE1}), 8 ) ) { rFS_FileMapClose ( &fm ); goto P_End; }
     rFS_FileMapClose ( &fm );
@@ -70,7 +66,7 @@ UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
   else
   if ( r4_path_ending_s4w_txt ( s4wPath ) )
   {
-    iErr = rParse_Txt ( s4wPath, s4wOrigin, wszFileName );
+    rParse_Txt ( s4wPath, s4wOrigin, wszFileName );
   }
   else
   if ( r4_path_ending_s4w_las ( s4wPath ) )

@@ -26,6 +26,7 @@ static _locale_t g_locale_C = NULL;
 #include "ag47_settings.c"
 #include "ag47_fs.c"
 #include "ag47_parse_docx.c"
+#include "ag47_parse_txt.c"
 #include "ag47_parse_las.c"
 #include "ag47_parse.c"
 
