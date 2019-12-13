@@ -105,14 +105,14 @@ static UINT rParse_Docx_GetAngleType ( LPWSTR * const w )
       s += 4;
       while ( *s )
       {
-        if ( _wcsnicmp_l ( s, L"град", 4, g_locale_C ) == 0 )
+        if ( _wcsnicmp_l ( s, L"гр", 2, g_locale_C ) == 0 )
         {
-          *w = s+4; return 1;
+          *w = s+2; return 1;
         }
         else
-        if ( _wcsnicmp_l ( s, L"мин", 3, g_locale_C ) == 0 )
+        if ( _wcsnicmp_l ( s, L"ми", 2, g_locale_C ) == 0 )
         {
-          *w = s+3; return 2;
+          *w = s+2; return 2;
         }
         else
         {
@@ -235,7 +235,7 @@ void _rDocx_CB_endElement ( struct docx_state_ink * const p, const CHAR * name )
           LPWSTR w;
           p->fAngleS = wcstod ( p->s4w+15, &w );
           p->iS = kD74_angle;
-          UINT i = rParse_Docx_GetAngleType ( &w );
+          const UINT i = rParse_Docx_GetAngleType ( &w );
           if ( i == 0 )
           {
             rLog_Error ( L" => DOCX: Невозможо узнать размерность значения угла\n" );
@@ -359,7 +359,7 @@ void _rDocx_CB_endElement ( struct docx_state_ink * const p, const CHAR * name )
                 rLog_Error ( L" => DOCX: Таблица заканчивается не единственным пустым значением\n" );
               }
             }
-            r4_add_array_s4s ( p->pData, &t, 1 );
+            p->pData = r4_add_array_s4s ( p->pData, &t, 1 );
           }
           else
           if ( p->n_tc == p->iAn )
