@@ -90,6 +90,9 @@ struct docx_state_ink
   // LPWSTR **   s4ppwLastRow;
   // LPWSTR *    s4pwLastColumn;
   // LPWSTR      s4wLastParagraph;
+
+  UINT                  iCodePage;      // Номер кодировки
+  UINT                  iLineFeed;      // Символ перехода на новую строку
 };
 
 static UINT rParse_Docx_GetAngleType ( LPWSTR * const w )
@@ -495,35 +498,38 @@ static UINT rParse_Docx ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const L
 
   if ( ( iErr = xmlSAXUserParseMemory ( &hSAX, &_, (LPCSTR)fm.pData, fm.nSize ) ) ) { goto P_End; }
 
-  const LPWSTR s4w3 = r4_alloca_s4w(kPathMax);
-  r4_push_path_s4w_s4w ( s4w3, s4wPathOutLogsDir );
-  swprintf ( s4w3+r4_get_count_s4w(s4w3), kPathMax-r4_get_count_s4w(s4w3),
-          L"\\%s.[%03u].%u.txt", wszFileName, i, _.iS );
-
-  FILE * const pF_log2 = rOpenFileToWriteWith_UTF16_BOM ( s4w3 );
-  fwprintf (pF_log2, L"Скважина:                  \t%u\r\n", _.fWell );
-  fwprintf (pF_log2, L"Диаметр скважины:          \t%f\r\n", _.fDi );
-  fwprintf (pF_log2, L"Глубина башмака кондуктора:\t%f\r\n", _.fGBK );
-  fwprintf (pF_log2, L"Угол склонения:            \t%f %s\r\n", _.fAngleS, _.bAngleS ? L"минуты" : L"градусы" );
-  fwprintf (pF_log2, L"Альтитуда:                 \t%f\r\n", _.fAlt );
-  fwprintf (pF_log2, L"Забой:                     \t%f\r\n", _.fZab );
-  fwprintf (pF_log2, L"Количество данных:         \t%u\r\n", _.nData );
-  fwprintf (pF_log2, L"\r\n" );
-  fwprintf (pF_log2, L"%-10s\t%-10s\t%-10s\r\n", L"Глубина", L"Угол", L"Азимут" );
-  for ( UINT i = 0; i < _.nData; ++i )
+  if ( _.iS != kD7_Null )
   {
-    fwprintf (pF_log2, L"%10.4f\t", _.pData[i].fDepth );
-    if ( _.pData[i].iAn == 1 ) { fwprintf (pF_log2, L"%10.4f", _.pData[i].fAn ); }
-    else if ( _.pData[i].iAn == 2 ) { fwprintf (pF_log2, L"*%9.4f", _.pData[i].fAn ); }
-    else { fwprintf (pF_log2, L"          " ); }
-    fwprintf (pF_log2, L"\t" );
-    if ( _.pData[i].iAz == 1 ) { fwprintf (pF_log2, L"%10.4f", _.pData[i].fAz ); }
-    else if ( _.pData[i].iAz == 2 ) { fwprintf (pF_log2, L"*%9.4f", _.pData[i].fAz ); }
-    else { fwprintf (pF_log2, L"          " ); }
+    const LPWSTR s4w3 = r4_alloca_s4w(kPathMax);
+    r4_push_path_s4w_s4w ( s4w3, s4wPathOutLogsDir );
+    swprintf ( s4w3+r4_get_count_s4w(s4w3), kPathMax-r4_get_count_s4w(s4w3),
+            L"\\%s.[%03u].%u.txt", wszFileName, i, _.iS );
+    FILE * const pF_log2 = rOpenFileToWriteWith_UTF16_BOM ( s4w3 );
+    fwprintf (pF_log2, L"Скважина:                  \t%u\r\n", _.fWell );
+    fwprintf (pF_log2, L"Диаметр скважины:          \t%f\r\n", _.fDi );
+    fwprintf (pF_log2, L"Глубина башмака кондуктора:\t%f\r\n", _.fGBK );
+    fwprintf (pF_log2, L"Угол склонения:            \t%f\r\n", _.fAngleS );
+    fwprintf (pF_log2, L"Альтитуда:                 \t%f\r\n", _.fAlt );
+    fwprintf (pF_log2, L"Забой:                     \t%f\r\n", _.fZab );
+    fwprintf (pF_log2, L"Количество данных:         \t%u\r\n", _.nData );
     fwprintf (pF_log2, L"\r\n" );
+    fwprintf (pF_log2, L"%-10s\t%-10s\t%-10s\r\n", L"Глубина", L"Угол", L"Азимут" );
+    for ( UINT i = 0; i < _.nData; ++i )
+    {
+      fwprintf (pF_log2, L"%10.4f\t", _.pData[i].fDepth );
+      if ( _.pData[i].iAn == 1 ) { fwprintf (pF_log2, L"%10.4f", _.pData[i].fAn ); }
+      else if ( _.pData[i].iAn == 2 ) { fwprintf (pF_log2, L"*%9.4f", _.pData[i].fAn ); }
+      else { fwprintf (pF_log2, L"          " ); }
+      fwprintf (pF_log2, L"\t" );
+      if ( _.pData[i].iAz == 1 ) { fwprintf (pF_log2, L"%10.4f", _.pData[i].fAz ); }
+      else if ( _.pData[i].iAz == 2 ) { fwprintf (pF_log2, L"*%9.4f", _.pData[i].fAz ); }
+      else { fwprintf (pF_log2, L"          " ); }
+      fwprintf (pF_log2, L"\r\n" );
+    }
+    fclose ( pF_log2 );
   }
-  fclose ( pF_log2 );
 
+  P_End:
   fclose ( _.pF_xml );
   fclose ( _.pF_log );
 
@@ -539,14 +545,8 @@ static UINT rParse_Docx ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const L
       rLog_Error_WinAPI ( DeleteFile, GetLastError(), L"%s\n", s4w2 );
       iErr = __LINE__;
     }
-    if ( !DeleteFile ( s4w3 ) )
-    {
-      rLog_Error_WinAPI ( DeleteFile, GetLastError(), L"%s\n", s4w2 );
-      iErr = __LINE__;
-    }
   }
 
-  P_End:
   rFS_FileMapClose ( &fm );
   P_End2:
   r4_cut_end_s4w ( s4wPath, n );
