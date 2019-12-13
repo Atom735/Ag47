@@ -78,7 +78,8 @@ static UINT rFS_GetCurrentDirectory_s4w ( const LPWSTR s4w )
 */
 static UINT rFS_AddDir ( const LPWSTR s4w, const LPCWSTR wsz, const UINT k )
 {
-  const UINT n = r4_push_array_s4w_sz ( s4w, wsz, k );
+  const UINT n = r4_get_count_s4w ( s4w );
+  r4_push_array_s4w_sz ( s4w, wsz, k );
   if ( ! CreateDirectory ( s4w, NULL ) )
   {
     const UINT i = GetLastError();
@@ -106,7 +107,8 @@ static UINT rFS_Tree ( const LPWSTR s4wPath,
 {
   WIN32_FIND_DATA ffd;
   UINT iErr = 0;
-  const UINT n1 = r4_push_array_s4w_sz ( s4wPath, L"\\*", 3 );
+  const UINT n1 = r4_get_count_s4w ( s4wPath );
+  r4_push_array_s4w_sz ( s4wPath, L"\\*", 3 );
   const HANDLE hFind  = FindFirstFile ( s4wPath, &ffd );
   if ( hFind == INVALID_HANDLE_VALUE )
   {
@@ -119,7 +121,8 @@ static UINT rFS_Tree ( const LPWSTR s4wPath,
   {
     if ( wcscmp ( ffd.cFileName, L"." ) == 0 ) continue;
     if ( wcscmp ( ffd.cFileName, L".." ) == 0 ) continue;
-    const UINT n2 = r4_push_array_s4w_sz ( s4wPath, L"\\", 2 );
+    const UINT n2 = r4_get_count_s4w ( s4wPath );
+    r4_push_array_s4w_sz ( s4wPath, L"\\", 2 );
     r4_push_array_s4w_sz ( s4wPath, ffd.cFileName, 0 );
     if ( ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
     { if ( prFolderProc ) { if ( ( iErr = prFolderProc ( s4wPath, ffd.cFileName, s4wOrigin ) ) ) goto P_Err; } }
@@ -200,7 +203,8 @@ static UINT rFS_NewRandDir_s4w ( const LPWSTR s4w )
   while ( TRUE )
   {
     x = (x * 1103515245U) + 12345U;
-    const UINT k = r4_push_array_s4w_sz ( s4w, wsz, swprintf ( wsz, 11, L"\\%08" TEXT(PRIx32), x ) + 1 );
+    const UINT k = r4_get_count_s4w ( s4w );
+    r4_push_array_s4w_sz ( s4w, wsz, swprintf ( wsz, 11, L"\\%08" TEXT(PRIx32), x ) + 1 );
     if ( !CreateDirectory ( s4w, NULL ) )
     {
       const UINT i = GetLastError();

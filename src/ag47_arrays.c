@@ -450,26 +450,25 @@ static LPVOID * r4_realloc_s4p ( LPVOID * const p, UINT n )
   n                     -- количество символов для копирования ( 0 - если до нулевого символа )
   return                -- старая длина строки
 */
-static UINT r4_push_array_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
+static LPWSTR r4_push_array_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
 {
   if ( n == 0 ) { n = wcslen ( wsz )+1; }
   struct s4w_head * const h = D4GetPtrHead_s4w(s4);
   if ( h->memsz < h->count + n )
   {
     rLog_Error ( L"\t==> Нехватает места для объединения строк [%s] и [%s]\n", s4, wsz );
-    return h->count;
+    return s4;
   }
   else
   {
     wmemcpy ( s4+h->count, wsz, n );
-    const UINT u = h->count;
     h->count += n-1;
-    return u;
+    return s4;
   }
 }
 #define r4_push_array_s4w_s4w(_p_,_w_) r4_push_array_s4w_sz(_p_,_w_,r4_get_count_s4w(_w_)+1)
 
-static UINT r4_add_array_s4s ( VOID * const s4s, VOID const * const pElement, const UINT nCount )
+static VOID* r4_add_array_s4s ( VOID * const s4s, VOID const * const pElement, const UINT nCount )
 {
   struct s4s_head * const pH = D4GetPtrHead_s4s(s4s);
   if ( pH->memsz < pH->count + nCount )
@@ -479,9 +478,8 @@ static UINT r4_add_array_s4s ( VOID * const s4s, VOID const * const pElement, co
   else
   {
     memcpy ( s4s + (pH->count*pH->elemsz), pElement, nCount*pH->elemsz );
-    const UINT u = pH->count;
     pH->count += nCount;
-    return u;
+    return s4s;
   }
 }
 
@@ -492,22 +490,22 @@ static UINT r4_add_array_s4s ( VOID * const s4s, VOID const * const pElement, co
   s4                    -- вектор
   n                     -- конеченая длина
 */
-static UINT r4_cut_end_s4w ( const LPWSTR s4, const UINT n )
+static LPWSTR r4_cut_end_s4w ( const LPWSTR s4, const UINT n )
 {
   struct s4w_head * const h = D4GetPtrHead_s4w(s4);
   if ( h->count < n )
   {
     rLog_Error ( L"\t==> Невозможно обрезать строку за пределами строки [%s] (%u/%u)\n", s4, n, h->count );
-    return h->count;
+    return s4;
   }
   else
   {
     h->count = n;
     s4[n] = L'\0';
-    return h->count;
+    return s4;
   }
 }
-static UINT r4_init_s4w ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
+static LPWSTR r4_init_s4w ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
 {
   r4_cut_end_s4w ( s4, 0 );
   return r4_push_array_s4w_sz ( s4, wsz, n );

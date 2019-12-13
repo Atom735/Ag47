@@ -319,9 +319,9 @@ static UINT rParse_Las_S_C ( struct file_state_las * const pL )
     rLog_Error ( L" => LAS(%u): Некооректное значение версии файла\n", pL->t.nLine );
     return __LINE__;
   }
-  r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'C',
+  pL->pArray = r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'C',
           .aMNEM = *aMNEM, .aUNIT = *aUNIT, .aDATA = *aDATA, .aDESC = *aDESC, .aLine = *aLine }), 1 );
-  r4_add_array_s4s ( pL->pA_C, &((struct las_c_data){
+  pL->pA_C = r4_add_array_s4s ( pL->pA_C, &((struct las_c_data){
           .aMNEM = *aMNEM, .aUNIT = *aUNIT, .aDATA = *aDATA, .aDESC = *aDESC, .aLine = *aLine,
           .fSTRT = pL->w_STOP.d, .fSTOP = pL->w_STRT.d }), 1 );
   return 0;
@@ -341,7 +341,7 @@ static UINT rParse_Las_S_P ( struct file_state_las * const pL )
     rLog_Error ( L" => LAS(%u): Некооректное значение версии файла\n", pL->t.nLine );
     return __LINE__;
   }
-  r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'P',
+  pL->pArray = r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'P',
           .aMNEM = *aMNEM, .aUNIT = *aUNIT, .aDATA = *aDATA, .aDESC = *aDESC, .aLine = *aLine }), 1 );
   return 0;
 }
@@ -360,7 +360,7 @@ static UINT rParse_Las_S_O ( struct file_state_las * const pL )
     rLog_Error ( L" => LAS(%u): Некооректное значение версии файла\n", pL->t.nLine );
     return __LINE__;
   }
-  r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'O',
+  pL->pArray = r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'O',
           .aMNEM = *aMNEM, .aUNIT = *aUNIT, .aDATA = *aDATA, .aDESC = *aDESC, .aLine = *aLine }), 1 );
   return 0;
 }
@@ -414,7 +414,7 @@ static UINT rParse_Las_S_W ( struct file_state_las * const pL )
       pL->w_WELL._ = *aDATA;
     }
   }
-  r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'W',
+  pL->pArray = r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'W',
           .aMNEM = *aMNEM, .aUNIT = *aUNIT, .aDATA = *aDATA, .aDESC = *aDESC, .aLine = *aLine }), 1 );
   return 0;
 }
@@ -459,7 +459,7 @@ static UINT rParse_Las_S_V ( struct file_state_las * const pL )
     rLog_Error ( L" => LAS(%u): Неизвестная мнемоника %.*hs\n", p->nLine, aMNEM->n, aMNEM->p );
     return __LINE__;
   }
-  r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'V',
+  pL->pArray = r4_add_array_s4s ( pL->pArray, &((struct las_line_data){ .iSection = 'V',
           .aMNEM = *aMNEM, .aUNIT = *aUNIT, .aDATA = *aDATA, .aDESC = *aDESC, .aLine = *aLine }), 1 );
   return 0;
 }

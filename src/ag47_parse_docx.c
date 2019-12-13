@@ -457,7 +457,8 @@ void _rDocx_CB_characters ( struct docx_state_ink * const p, const xmlChar * ch,
 static UINT rParse_Docx ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const LPCWSTR wszFileName )
 {
   rLog ( L"Parse_DOCX: %-256s ==> %-256s\n", s4wOrigin, s4wPath );
-  const UINT n = r4_push_array_s4w_sz ( s4wPath, L"\\word\\document.xml", 0 );
+  const UINT n = r4_get_count_s4w ( s4wPath );
+  r4_push_array_s4w_sz ( s4wPath, L"\\word\\document.xml", 0 );
   struct file_map fm;
   UINT iErr = 0;
   if ( ( iErr = rFS_FileMapOpen ( &fm, s4wPath ) ) ) goto P_End2;
