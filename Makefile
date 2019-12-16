@@ -38,6 +38,7 @@ DEPENDS := \
   src/ag47_parse_docx.c \
   src/ag47_parse_las.c \
   src/ag47_parse_txt.c \
+  src/ag47_dbf.c \
   src/ag47_parse.c \
 
 OUT_EXE := main.exe

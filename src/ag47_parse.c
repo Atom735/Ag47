@@ -21,6 +21,7 @@ UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
   r4_push_array_s4w_sz ( s4wOrigin, L"\\", 2 );
   r4_push_array_s4w_sz ( s4wOrigin, wszFileName, 0 );
   UINT iErr = 0;
+  #if 0
   if ( r4_path_ending_s4w_zip ( s4wPath ) )
   {
     const LPWSTR s4wPathTempDir = r4_alloca_s4w ( kPathMax );
@@ -73,7 +74,13 @@ UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
   else
   if ( r4_path_ending_s4w_las ( s4wPath ) )
   {
-    // rParse_Las ( s4wPath, s4wOrigin, wszFileName );
+    rParse_Las ( s4wPath, s4wOrigin, wszFileName );
+  }
+  else
+  #endif
+  if ( r4_path_ending_s4w_dbf ( s4wPath ) )
+  {
+    rParse_DBF ( s4wPath, s4wOrigin, wszFileName );
   }
   P_End:
   r4_cut_end_s4w ( s4wOrigin, n );
