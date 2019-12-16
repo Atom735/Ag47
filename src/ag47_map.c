@@ -149,3 +149,72 @@ static UINT rGetBufCodePage ( BYTE const * pBuf, UINT nSize, UINT a1[g7CharMapCo
 }
 
 
+
+enum
+{
+  kCP_Utf16LE = 1200,
+  kCP_Utf16BE = 1201,
+  kCP_Utf32LE = 12000,
+  kCP_Utf32BE = 12001,
+  kCP_Utf8 = 65001,
+};
+
+/*
+  Получает ID кодовый странице по названию
+*/
+static UINT rGetCodePageIdByAsciiName ( const LPCSTR sz )
+{
+  if ( *sz == '.' ) { return atoi(sz+1); }
+  #define _D7xPre(_i_,_ss_,_sl_) \
+    if ( strncasecmp ( sz, _ss_, sizeof(_ss_)-1 ) == 0 && !isalnum ( sz[sizeof(_ss_)-1] ) ) { return _i_; } \
+    if ( strncasecmp ( sz, _sl_, sizeof(_sl_)-1 ) == 0 && !isalnum ( sz[sizeof(_sl_)-1] ) ) { return _i_; }
+  #include "ag47_maps_names.x"
+  #undef _D7xPre
+  return 0;
+}
+/*
+  Получает название кодовой страницы по ID
+*/
+static LPCSTR rGetCodePageNameById ( UINT const iCP )
+{
+  switch ( iCP )
+  {
+    #define _D7xPre(_i_,_ss_,_sl_) case _i_: return _ss_;
+    #include "ag47_maps_names.x"
+    #undef _D7xPre
+    default: return NULL;
+  }
+}
+
+static BOOL rIsBOM_Utf16LE ( struct mem_ptr_bin const * const p )
+{
+  return ( p->n >= 3 ) && ( p->p[0]==0xFF ) && ( p->p[1]==0xFE ) && ( p->p[2]!=0x00 );
+}
+static BOOL rIsBOM_Utf16BE ( struct mem_ptr_bin const * const p )
+{
+  return ( p->n >= 3 ) && ( p->p[0]==0xFE ) && ( p->p[1]==0xFF ) && ( p->p[2]!=0x00 );
+}
+static BOOL rIsBOM_Utf32LE ( struct mem_ptr_bin const * const p )
+{
+  return ( p->n >= 5 ) && ( p->p[0]==0xFF ) && ( p->p[1]==0xFE ) && ( p->p[2]==0x00 ) && ( p->p[3]==0x00 ) && ( p->p[4]!=0x00 );
+}
+static BOOL rIsBOM_Utf32BE ( struct mem_ptr_bin const * const p )
+{
+  return ( p->n >= 5 ) && ( p->p[0]==0x00 ) && ( p->p[1]==0x00 ) && ( p->p[2]==0xFE ) && ( p->p[3]==0xFF ) && ( p->p[4]!=0x00 );
+}
+static BOOL rIsBOM_Utf8 ( struct mem_ptr_bin const * const p )
+{
+  return ( p->n >= 4 ) && ( p->p[0]==0xEF ) && ( p->p[1]==0xBB ) && ( p->p[2]==0xBF ) && ( p->p[3]!=0x00 );
+}
+
+
+static UINT rGetBOM ( struct mem_ptr_bin * const p )
+{
+  if ( rIsBOM_Utf8 ( p ) )    { rMemPtrBin_Skip ( p, 3 ); return kCP_Utf8; }
+  if ( rIsBOM_Utf16LE ( p ) ) { rMemPtrBin_Skip ( p, 2 ); return kCP_Utf16LE; }
+  if ( rIsBOM_Utf16BE ( p ) ) { rMemPtrBin_Skip ( p, 2 ); return kCP_Utf16BE; }
+  if ( rIsBOM_Utf32LE ( p ) ) { rMemPtrBin_Skip ( p, 4 ); return kCP_Utf32LE; }
+  if ( rIsBOM_Utf32BE ( p ) ) { rMemPtrBin_Skip ( p, 4 ); return kCP_Utf32BE; }
+  return 0;
+}
+
