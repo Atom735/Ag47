@@ -18,10 +18,33 @@ static UINT rGetMaxNums ( UINT const * const pData, UINT const nSize )
 enum
 {
   kNewLine_Null = 0,
-  kNewLine_CR,
-  kNewLine_LF,
   kNewLine_CRLF,
+  kNewLine_LF,
+  kNewLine_CR,
 };
+
+/*
+  return
+      {1},{CRLF}        - Значение как в системах Windows
+      {2},{LF}          - Значение как в системах UNIX
+      {3},{CR}          - Значение как в системах Macintosh
+*/
+static UINT rGetBuf_NL ( BYTE const * pBuf, UINT nSize )
+{
+  UINT iCRLF = 0;
+  UINT iLF = 0;
+  UINT iCR = 0;
+  while ( nSize > 1)
+  {
+    if ( *pBuf == '\r' ) { ++iCR; if ( iCR == 8 ) { return kNewLine_CR; }
+    if ( pBuf[1] == '\n' ) { ++iCRLF; if ( iCRLF == 4 ) { return kNewLine_CRLF; } } }
+    else
+    if ( *pBuf == '\n' ) { ++iLF;  if ( iLF == 8 ) { return kNewLine_LF; } }
+    ++pBuf; --nSize;
+  }
+  iCRLF *= 2;
+  return (iCRLF>iCR) ? ( (iCRLF>iLF) ? kNewLine_CRLF : kNewLine_LF ) : ( (iCR>iLF) ? kNewLine_CR : kNewLine_LF );
+}
 
 /* Сравнивает память и слово, возвращает длину слова при совпадении */
 static UINT rStrCmpArrayAA ( const LPCSTR p, const UINT n, const LPCSTR p2 )
@@ -73,10 +96,10 @@ static BOOL rMemPtrBin_Skip_1ByteIfNotArray ( struct mem_ptr_bin * const p, BYTE
 
 /* Смещает указатель на один байт если isspace() */
 static BOOL rMemPtrBin_Skip_1ByteIfSpace ( struct mem_ptr_bin * const p )
-{ return ( p->n && rStrIsSpace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
+{ return ( p->n && isspace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
 /* Смещает указатель на один байт если не isspace() */
 static BOOL rMemPtrBin_Skip_1ByteIfNotSpace ( struct mem_ptr_bin * const p )
-{ return ( p->n && !rStrIsSpace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
+{ return ( p->n && !isspace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
 /* Пропускает все isspace() байты, возвращает количество оставшихся байт */
 static UINT rMemPtrBin_Skip_ToFirstNonSpace ( struct mem_ptr_bin * const p )
 { while ( rMemPtrBin_Skip_1ByteIfSpace ( p ) ); return p->n; }
@@ -111,9 +134,9 @@ static BOOL rMemPtrTxt_IsNewLine ( struct mem_ptr_txt const * const p )
 {
   switch ( p->iNL )
   {
+    case kNewLine_CRLF: return ((p->n>=2) && (p->p[0] == '\r') && (p->p[1] == '\n')) ? 2 : 0;
     case kNewLine_CR: return ((p->n) && (p->p[0] == '\r')) ? 1 : 0;
     case kNewLine_LF: return ((p->n) && (p->p[0] == '\n')) ? 1 : 0;
-    case kNewLine_CRLF: return ((p->n>2) && (p->p[0] == '\r') && (p->p[1] == '\n')) ? 2 : 0;
     default: return 0;
   }
 }
@@ -129,7 +152,7 @@ static BOOL rMemPtrTxt_Skip ( struct mem_ptr_txt * const p, UINT n )
     while ( n )
     {
       const UINT i = rMemPtrTxt_IsNewLine ( p );
-      if ( i ) { rMemPtrTxt_Skip_NoValid ( p, i ); ++(p->nLine); if ( n < i ) { return FALSE; } else { n -= i; } }
+      if ( i ) { rMemPtrTxt_Skip_NoValid ( p, i ); ++(p->nLine); if ( n < i ) { return TRUE; } else { n -= i; } }
       else { rMemPtrTxt_Skip_NoValid ( p, 1 ); --n; }
     }
     return TRUE;
@@ -152,10 +175,10 @@ static BOOL rMemPtrTxt_Skip_1ByteIfNotArraySz ( struct mem_ptr_txt * const p, LP
 
 /* Смещает указатель на один байт если isspace() */
 static BOOL rMemPtrTxt_Skip_1ByteIfSpace ( struct mem_ptr_txt * const p )
-{ return ( p->n && rStrIsSpace ( (BYTE)*(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
+{ return ( p->n && isspace ( *(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
 /* Смещает указатель на один байт если не isspace() */
 static BOOL rMemPtrTxt_Skip_1ByteIfNotSpace ( struct mem_ptr_txt * const p )
-{ return ( p->n && !rStrIsSpace ( (BYTE)*(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
+{ return ( p->n && !isspace ( *(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
 /* Пропускает все isspace() байты, возвращает количество оставшихся байт */
 static UINT rMemPtrTxt_Skip_ToFirstNonSpace ( struct mem_ptr_txt * const p )
 { while ( rMemPtrTxt_Skip_1ByteIfSpace ( p ) ); return p->n; }

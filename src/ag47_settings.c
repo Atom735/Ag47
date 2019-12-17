@@ -128,6 +128,7 @@ enum
   kErr_Script_EndOfValue,
   kErr_Script_EqValue,
   kErr_Script_ErrSymbol,
+  kErr_Script_ValueName,
 };
 
 LPCWSTR const g7ErrStrScript[] =
@@ -137,6 +138,7 @@ LPCWSTR const g7ErrStrScript[] =
   [kErr_Script_EndOfValue]              = L"Ошибка синтаксиса, отсуствует символ \';\'",
   [kErr_Script_EqValue]                 = L"Ошибка синтаксиса, отсуствует символ \'=\'",
   [kErr_Script_ErrSymbol]               = L"Ошибка синтаксиса, непредвиденный символ",
+  [kErr_Script_ValueName]               = L"Неизвестное название переменной",
 };
 
 static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
@@ -198,7 +200,9 @@ static BOOL rScript_ParseValName_String ( struct ag47_script * const script,
 
 static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_ptr_txt * const p )
 {
-  return rScript_ParseValName_String ( script, p, &(script->s4wRun), "RUN" );
+  return
+  rScript_ParseValName_String ( script, p, &(script->s4wRun), "RUN" ) &&
+  ( rLogScript ( script, kErr_Script_ValueName ), FALSE );
 }
 
 static BOOL rScript_ParseOne ( struct ag47_script * const script, struct mem_ptr_txt * const p )
@@ -260,7 +264,7 @@ static UINT rScriptRunMem ( BYTE const * const pBuf, UINT const nSize )
   _script.iCP = rGetBOM ( &_ptr );
   if ( ( _script.iCP == 0 ) || ( _script.iCP == kCP_Utf8 ) )
   {
-    struct mem_ptr_txt _txt = { ._ = _ptr, .nLine = 1, .iNL = rGetBufEndOfLine ( pBuf, nSize ) };
+    struct mem_ptr_txt _txt = { ._ = _ptr, .nLine = 1, .iNL = rGetBuf_NL ( pBuf, nSize ) };
     _script.p_txt = &_txt;
     rScript_GetCodePage ( &_script, &_ptr );
     while ( rScript_ParseOne ( &_script, &_txt ) );
