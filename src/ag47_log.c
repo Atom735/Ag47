@@ -21,7 +21,7 @@ static UINT rLog ( const LPCWSTR fmt, ... )
 
 static UINT rLog_Error_v ( const LPCSTR szFile,  const UINT nLine, const LPCWSTR fmt, va_list args )
 {
-  rLog ( L"!ERROR: %hs (%d)\n", szFile, nLine );
+  rLog ( L"!ERROR: %hs (%d)\r\n", szFile, nLine );
   return rLog_v ( fmt, args );
 }
 
@@ -44,7 +44,7 @@ static VOID rLog_Error_WinAPI_ ( const LPCSTR szFile,  const UINT nLine, const L
   WCHAR buf[1024];
   FormatMessage ( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
           iErr, MAKELANGID(LANG_RUSSIAN, SUBLANG_DEFAULT), buf, 1024, NULL );
-  rLog ( L"\t==> %hs (%d)\n\t==> %s", prFunc, iErr, buf );
+  rLog ( L"\t==> %hs (%d)\r\n\t==> %s", prFunc, iErr, buf );
 }
 #define rLog_Error_WinAPI(prFunc,iErr,...) rLog_Error_WinAPI_(__FILE__,__LINE__,#prFunc,iErr,__VA_ARGS__)
 

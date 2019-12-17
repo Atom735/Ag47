@@ -1,5 +1,6 @@
-﻿
+﻿    RUN = 'ЫHжeдlElo World!ЙЙA'  ;
 
+/*
   PATH_IN  = [
     "t_data\2007г/2201/2201/las",
     //".\t_data\2007г",
@@ -11,10 +12,4 @@
  /* PATH_OUT =
     ".\t_data";
 */
-  FORMAT_AR=[".zip",".rar"];
 
-  //RECREATE;
-
-  //RUN_TREE   ;
-
-  //RUN_PARSE;

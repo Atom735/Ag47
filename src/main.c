@@ -23,8 +23,8 @@ static _locale_t g_locale_C = NULL;
 #include "ag47_log.c"
 #include "ag47_map.c"
 #include "ag47_arrays.c"
-#include "ag47_settings.c"
 #include "ag47_fs.c"
+#include "ag47_settings.c"
 #include "ag47_parse_docx.c"
 #include "ag47_parse_txt.c"
 #include "ag47_parse_las.c"
@@ -39,6 +39,8 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
   g_s4wPathToWordConv = r4_alloca_s4w ( PATH_MAX );
   g_s4wPathTo7Zip = r4_alloca_s4w ( PATH_MAX );
   rFS_SearchExe ( );
+  return rScriptRunFile ( L".ag47-script" );
+  #if 0
   s4wPathOut = r4_alloca_init_ex_s4w ( L"\\\\?\\", kPathMax );
   rFS_GetCurrentDirectory_s4w ( s4wPathOut );
   rFS_AddDir ( s4wPathOut, L"\\.ag47", 0 );
@@ -66,4 +68,5 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
   _free_locale ( g_locale_C );
   rLocalsFree ( );
   return iErr;
+  #endif
 }

@@ -23,12 +23,42 @@ enum
   kNewLine_CRLF,
 };
 
+/* Сравнивает память и слово, возвращает длину слова при совпадении */
+static UINT rStrCmpArrayAA ( const LPCSTR p, const UINT n, const LPCSTR p2 )
+{
+  UINT i = 0;
+  for ( ; i < n && p2[i]; ++i ) { if ( p[i]!= p2[i] ) { return 0; } }
+  if ( p2[i] ) { return 0; }
+  return i;
+}
+/* Сравнивает память и слово, проверяя границу, возвращает длину слова при совпадении */
+static UINT rStrCmpWordAA ( const LPCSTR p, const UINT n, const LPCSTR p2 )
+{
+  UINT i = 0;
+  for ( ; i < n && p2[i]; ++i ) { if ( p[i]!= p2[i] ) { return 0; } }
+  if ( p2[i] || ( isalnum ( p[i] ) || p[i] == '_' || *p == '-' ) ) { return 0; }
+  return i;
+}
+/* Сравнивает память и слово игнорируя регистр, проверяя границу, возвращает длину слова при совпадении */
+static UINT rStrCmpCaseWordAA ( const LPCSTR p, const UINT n, const LPCSTR p2 )
+{
+  UINT i = 0;
+  for ( ; i < n && p2[i]; ++i ) { if ( tolower ( p[i] ) != tolower ( p2[i] ) ) { return 0; } }
+  if ( p2[i] || ( isalnum ( p[i] ) || p[i] == '_' || *p == '-' ) ) { return 0; }
+  return i;
+}
+
 /* Указатель на бинарыне данные в памяти */
 struct mem_ptr_bin
 {
   BYTE          const * p;              // Указатель на данные
   UINT                  n;              // Сколько данных осталось
 };
+
+static BOOL rStrIsSpace ( BYTE const i )
+{
+  return i == '\r' || i == '\n' || i == '\t' || i == ' ' ;
+}
 
 /* Смещает указатель на n байт, возвращает TRUE если смог сместить */
 static BOOL rMemPtrBin_Skip ( struct mem_ptr_bin * const p, UINT const n )
@@ -43,10 +73,10 @@ static BOOL rMemPtrBin_Skip_1ByteIfNotArray ( struct mem_ptr_bin * const p, BYTE
 
 /* Смещает указатель на один байт если isspace() */
 static BOOL rMemPtrBin_Skip_1ByteIfSpace ( struct mem_ptr_bin * const p )
-{ return ( p->n && isspace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
+{ return ( p->n && rStrIsSpace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
 /* Смещает указатель на один байт если не isspace() */
 static BOOL rMemPtrBin_Skip_1ByteIfNotSpace ( struct mem_ptr_bin * const p )
-{ return ( p->n && !isspace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
+{ return ( p->n && !rStrIsSpace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
 /* Пропускает все isspace() байты, возвращает количество оставшихся байт */
 static UINT rMemPtrBin_Skip_ToFirstNonSpace ( struct mem_ptr_bin * const p )
 { while ( rMemPtrBin_Skip_1ByteIfSpace ( p ) ); return p->n; }
@@ -56,7 +86,7 @@ static UINT rMemPtrBin_Skip_ToFirstSpace ( struct mem_ptr_bin * const p )
 
 /* Смещает указатель к началу новой строки, возвращает количество оставшихся байт */
 static UINT rMemPtrBin_Skip_ToBeginNewLine ( struct mem_ptr_bin * const p )
-{ while ( rMemPtrBin_Skip_1ByteIfNotArray ( p, (BYTE const * const)("\n\r"), 2 ) ); return rMemPtrBin_Skip_ToFirstNonSpace ( p ); }
+{ while ( rMemPtrBin_Skip_1ByteIfNotArray ( p, (BYTE const *)("\n\r"), 2 ) ); return rMemPtrBin_Skip_ToFirstNonSpace ( p ); }
 
 
 
@@ -99,8 +129,7 @@ static BOOL rMemPtrTxt_Skip ( struct mem_ptr_txt * const p, UINT n )
     while ( n )
     {
       const UINT i = rMemPtrTxt_IsNewLine ( p );
-      if ( n > i ) { rMemPtrTxt_Skip_NoValid ( p, i ); n -= i; ++(p->nLine); }
-      else if ( i ) { return FALSE; } // Если не осталось данных для завершения конца строки, возвращаем ошибку
+      if ( i ) { rMemPtrTxt_Skip_NoValid ( p, i ); ++(p->nLine); if ( n < i ) { return FALSE; } else { n -= i; } }
       else { rMemPtrTxt_Skip_NoValid ( p, 1 ); --n; }
     }
     return TRUE;
@@ -123,10 +152,10 @@ static BOOL rMemPtrTxt_Skip_1ByteIfNotArraySz ( struct mem_ptr_txt * const p, LP
 
 /* Смещает указатель на один байт если isspace() */
 static BOOL rMemPtrTxt_Skip_1ByteIfSpace ( struct mem_ptr_txt * const p )
-{ return ( p->n && isspace ( *(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
+{ return ( p->n && rStrIsSpace ( (BYTE)*(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
 /* Смещает указатель на один байт если не isspace() */
 static BOOL rMemPtrTxt_Skip_1ByteIfNotSpace ( struct mem_ptr_txt * const p )
-{ return ( p->n && !isspace ( *(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
+{ return ( p->n && !rStrIsSpace ( (BYTE)*(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
 /* Пропускает все isspace() байты, возвращает количество оставшихся байт */
 static UINT rMemPtrTxt_Skip_ToFirstNonSpace ( struct mem_ptr_txt * const p )
 { while ( rMemPtrTxt_Skip_1ByteIfSpace ( p ) ); return p->n; }
@@ -136,16 +165,28 @@ static UINT rMemPtrTxt_Skip_ToFirstSpace ( struct mem_ptr_txt * const p )
 
 /* Смещает указатель к началу новой строки, возвращает количество оставшихся байт */
 static UINT rMemPtrTxt_Skip_ToBeginNewLine ( struct mem_ptr_txt * const p )
-{ while ( rMemPtrTxt_Skip_1ByteIfNotArray ( p, "\n\r", 2 ) ); return rMemPtrTxt_Skip_ToFirstNonSpace ( p ); }
+{ while ( rMemPtrTxt_Skip_1ByteIfNotArray ( p, "\r\n", 2 ) ); return rMemPtrTxt_Skip_ToFirstNonSpace ( p ); }
 
-/* Сравнивает память и слово игнорируя регистр, возвращает длину слова при совпадении */
-static UINT rStrCmpCaseWordAA ( const LPCSTR p, const UINT n, const LPCSTR p2 )
-{
-  UINT i = 0;
-  for ( ; i < n && p2[i]; ++i ) { if ( islower ( p[i] ) != islower ( p2[i] ) ) { return 0; } }
-  if ( p2[i] || ( isalnum ( p[i] ) || p[i] == '_' || *p == '-' ) ) { return 0; }
-  return i;
-}
+
+
+/* Сравнивает память и слово, возвращает длину слова при совпадении */
+static BOOL rMemPtrTxt_CmpArrayA ( struct mem_ptr_txt * const p, LPCSTR const sz )
+{ return rStrCmpArrayAA ( p->p, p->n, sz ); }
+/* Сравнивает память и слово, проверяя границу, возвращает длину слова при совпадении */
+static BOOL rMemPtrTxt_CmpWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
+{ return rStrCmpWordAA ( p->p, p->n, sz ); }
+/* Сравнивает память и слово игнорируя регистр, проверяя границу, возвращает длину слова при совпадении */
+static BOOL rMemPtrTxt_CmpCaseWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
+{ return rStrCmpCaseWordAA ( p->p, p->n, sz ); }
+
+/* Пропускает все байты доходя до слова, возвращает количество оставшихся байт */
+static UINT rMemPtrTxt_Skip_ToFirstCmpArrayA ( struct mem_ptr_txt * const p, LPCSTR const sz )
+{ while ( !rMemPtrTxt_CmpArrayA ( p, sz ) ) { rMemPtrTxt_Skip ( p, 1 ); } return p->n; }
+static UINT rMemPtrTxt_Skip_ToFirstCmpWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
+{ while ( !rMemPtrTxt_CmpWordA ( p, sz ) ) { rMemPtrTxt_Skip ( p, 1 ); } return p->n; }
+static UINT rMemPtrTxt_Skip_ToFirstCmpCaseWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
+{ while ( !rMemPtrTxt_CmpCaseWordA ( p, sz ) ) { rMemPtrTxt_Skip ( p, 1 ); } return p->n; }
+
 
 
 struct file_data_ptr    // указатель на данные файла

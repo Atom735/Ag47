@@ -4,6 +4,11 @@
     {0} == {FALSE} == {NO} == {NULL}
     {1+} == {TRUE} == {YES}
   */
+  union
+  {
+    struct mem_ptr_bin *p_bin;
+    struct mem_ptr_txt *p_txt;
+  };
 
   /* Код ошибки скрипта */
   UINT                  iErr;
@@ -69,10 +74,10 @@
     Символ новой строки для конечного [LAS] файла (если включена модификация)
     По умолчанию {NULL}
     Возможные значения:
-      {NULL}            - Значение как в исходном файле
-      {CRLF}            - Значение как в системах Windows
-      {LF}              - Значение как в системах UNIX
-      {CR}              - Значение как в системах Macintosh
+      {0},{NULL}        - Значение как в исходном файле
+      {1},{CRLF}        - Значение как в системах Windows
+      {2},{LF}          - Значение как в системах UNIX
+      {3},{CR}          - Значение как в системах Macintosh
   */
   UINT                  iLasNL;
   /*  LAS_CP
@@ -116,14 +121,111 @@
   UINT                  iInkCP;
 };
 
-
-
-
-
-
-static BOOL rScript_ParseOne ( struct ag47_script * const script, struct mem_ptr_bin * const p )
+enum
 {
+  kErr_Ok = 0,
+  kErr_Script_InvalidValue,
+  kErr_Script_EndOfValue,
+  kErr_Script_EqValue,
+  kErr_Script_ErrSymbol,
+};
 
+LPCWSTR const g7ErrStrScript[] =
+{
+  [kErr_Ok]                             = L"Всё в порядке",
+  [kErr_Script_InvalidValue]            = L"Ошибка синтаксиса, некорректное значение",
+  [kErr_Script_EndOfValue]              = L"Ошибка синтаксиса, отсуствует символ \';\'",
+  [kErr_Script_EqValue]                 = L"Ошибка синтаксиса, отсуствует символ \'=\'",
+  [kErr_Script_ErrSymbol]               = L"Ошибка синтаксиса, непредвиденный символ",
+};
+
+static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
+        struct ag47_script * const script, UINT const iErr )
+{
+  return rLog_Error_ ( szFile,  nLine, L"script on line (%u): %16.*hs\r\n  error 0x%x => %s\r\n",
+          script->p_txt->nLine, script->p_txt->n < 16 ? script->p_txt->n : 16,
+          script->p_txt->p, iErr, g7ErrStrScript[iErr] );
+}
+#define rLogScript(_s_,_i_) rLogScript_(__FILE__,__LINE__,_s_,_i_)
+
+
+static BOOL rScript_CaseName ( struct mem_ptr_txt * const p, LPCSTR const sz )
+{ return rMemPtrTxt_CmpCaseWordA ( p, sz ) && rMemPtrTxt_Skip_NoValid ( p, strlen ( sz ) ); }
+
+static BOOL rScript_ParseVal_String ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, LPWSTR * const ps4w )
+{
+  // rLog ( L" === (%x)%.8hs\r\n", *(p->p), p->p );
+  if ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) && ( *(p->p) == '=' ) &&
+       rMemPtrTxt_Skip_NoValid ( p, 1 ) && rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
+  {
+    // rLog ( L" === (%x)%.8hs\r\n", *(p->p), p->p );
+    if ( rScript_CaseName ( p, "NULL" ) || *(p->p) == ';' ) { if ( *ps4w ) { r4_free_s4w ( *ps4w ); *ps4w = NULL; } }
+    else
+    if ( *(p->p) == '\'' )
+    {
+      rMemPtrTxt_Skip_NoValid ( p, 1 );
+      UINT i = 0;
+      for ( ; i < p->n; ++i ) { if ( p->p[i] == '\'' ) { break; } }
+      UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
+      *ps4w = r4_malloc_s4w ( iW+1 );
+      r4_get_count_s4w ( (*ps4w) ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, *ps4w, iW+1 );
+      (*ps4w)[iW] = 0;
+      rMemPtrTxt_Skip_NoValid ( p, i+1 );
+    }
+    else
+    { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+    rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+    if ( *(p->p) == ';' ) { return rMemPtrTxt_Skip_NoValid ( p, 1 ); }
+    else
+    { rLogScript ( script, kErr_Script_EndOfValue ); return FALSE; }
+  }
+  else
+  { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
+}
+
+static BOOL rScript_ParseValName_String ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, LPWSTR * const ps4w, LPCSTR const sz )
+{
+  if ( rScript_CaseName ( p, sz ) )
+  {
+    const BOOL b = rScript_ParseVal_String ( script, p, ps4w );
+    if ( b ) { rLog ( L"script {%hs}\t=> \'%s\'\r\n", sz, *ps4w ); }
+    return b;
+  }
+  return FALSE;
+}
+
+static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_ptr_txt * const p )
+{
+  return rScript_ParseValName_String ( script, p, &(script->s4wRun), "RUN" );
+}
+
+static BOOL rScript_ParseOne ( struct ag47_script * const script, struct mem_ptr_txt * const p )
+{
+  rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+  if ( p->n )
+  {
+    switch ( *(p->p) )
+    {
+      case '#': return rMemPtrTxt_Skip_ToBeginNewLine ( p );
+      case '/':
+        if ( p->n >= 2 )
+        {
+          if ( (p->p)[1] == '/' ) { return rMemPtrTxt_Skip_ToBeginNewLine ( p ); }
+          else
+          if ( (p->p)[1] == '*' ) {  return rMemPtrTxt_Skip_ToFirstCmpArrayA ( p, "*/" ) >= 2 ?
+                  rMemPtrTxt_Skip_NoValid ( p, 2) : FALSE; }
+          else { rLogScript ( script, kErr_Script_ErrSymbol ); return FALSE; }
+        }
+      case 'a' ... 'z':
+      case 'A' ... 'Z':
+        return rScript_ParseName ( script, p );
+      default: rLogScript ( script, kErr_Script_ErrSymbol ); return FALSE;
+    }
+  }
+  else
+  { return FALSE; }
 }
 
 static VOID rScript_GetCodePage ( struct ag47_script * const script, struct mem_ptr_bin * const p )
@@ -132,10 +234,10 @@ static VOID rScript_GetCodePage ( struct ag47_script * const script, struct mem_
   {
     rMemPtrBin_Skip ( p, 1 );
     rMemPtrBin_Skip_ToFirstNonSpace ( p ) ;
-    const UINT iCP = rGetCodePageIdByAsciiName ( p->p );
+    const UINT iCP = rGetCodePageIdByAsciiName ( (LPCSTR)p->p );
     if ( script->iCP && script->iCP != iCP )
     {
-      rLog_Error ( L"Не свопадают BOM скрипта (%hs) и указаная кодировка (%hs)\r\n",
+      rLog_Error ( L"script не свопадают BOM скрипта (%hs) и указаная кодировка (%hs)\r\n",
               rGetCodePageNameById ( script->iCP ), rGetCodePageNameById ( iCP ) );
     }
     else
@@ -153,15 +255,21 @@ static VOID rScript_GetCodePage ( struct ag47_script * const script, struct mem_
 */
 static UINT rScriptRunMem ( BYTE const * const pBuf, UINT const nSize )
 {
-  struct ag47_script _script = { };
   struct mem_ptr_bin _ptr = { .p = pBuf, .n = nSize };
+  struct ag47_script _script = { .p_bin = &_ptr };
   _script.iCP = rGetBOM ( &_ptr );
   if ( ( _script.iCP == 0 ) || ( _script.iCP == kCP_Utf8 ) )
   {
-    rScript_GetCodePage ( &_script, &_ptr );
     struct mem_ptr_txt _txt = { ._ = _ptr, .nLine = 1, .iNL = rGetBufEndOfLine ( pBuf, nSize ) };
-    while ( rScript_ParseOne ( &_script, &_ptr ) );
+    _script.p_txt = &_txt;
+    rScript_GetCodePage ( &_script, &_ptr );
+    while ( rScript_ParseOne ( &_script, &_txt ) );
   }
+  else
+  {
+    rLog_Error ( L"Code Page\r\n" );
+  }
+
   return _script.iErr;
 }
 
@@ -171,6 +279,10 @@ static UINT rScriptRunMem ( BYTE const * const pBuf, UINT const nSize )
 */
 static UINT rScriptRunFile ( LPCWSTR const wszPath )
 {
-  struct ag47_script _script = { };
-  return 0;
+  struct file_map fm;
+  UINT iErr = 0;
+  if ( ( iErr = rFS_FileMapOpen ( &fm, wszPath ) ) ) { return iErr; }
+  iErr = rScriptRunMem ( fm.pData, fm.nSize );
+  rFS_FileMapClose ( &fm );
+  return iErr;
 }

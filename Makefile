@@ -47,4 +47,4 @@ all : $(OUT_EXE)
 	$(OUT_EXE)
 
 $(OUT_EXE) : src/main.c $(DEPENDS)
-	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $< $(LDFLAGS) -O3
+	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $< $(LDFLAGS)
