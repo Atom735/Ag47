@@ -15,6 +15,52 @@ static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
 static BOOL rScriptRun ( struct ag47_script * const script )
 {
   rLog ( L" === === === Выполнение сценария === === === \r\n" );
+  script->s4wOrigin = r4_alloca_s4w ( kPathMax );
+  r4_init_s4w_s4w ( script->s4wOrigin, script->s4wRun );
+
+  if ( !script->s4wOutPath )
+  {
+    script->s4wOutPath = r4_malloc_s4w ( kPathMax );
+    rFS_AddCurrentDirectory ( script->s4wOutPath );
+    rFS_AddDir ( script->s4wOutPath, L"\\.ag47", 0 );
+  }
+
+  if ( !script->s4wPathTo7Zip )
+  {
+    script->s4wPathTo7Zip = r4_malloc_s4w ( kPathMax );
+    rFS_SearchExe_7Zip ( script->s4wPathTo7Zip );
+  }
+
+  if ( !script->s4wPathToWordconv )
+  {
+    script->s4wPathToWordconv = r4_malloc_s4w ( kPathMax );
+    rFS_SearchExe_Wordconv ( script->s4wPathToWordconv );
+  }
+
+
+  script->s4wPathOutTempDir = r4_alloca_s4w ( kPathMax );
+  r4_init_s4w_s4w ( script->s4wPathOutTempDir, script->s4wOutPath );
+  rFS_AddDir ( script->s4wPathOutTempDir, L"\\.temp", 0 );
+  script->s4wPathOutLogsDir = r4_alloca_s4w ( kPathMax );
+  r4_init_s4w_s4w ( script->s4wPathOutLogsDir, script->s4wOutPath );
+  rFS_AddDir ( script->s4wPathOutLogsDir, L"\\.logs", 0 );
+  script->s4wPathOutLasDir = r4_alloca_s4w ( kPathMax );
+  r4_init_s4w_s4w ( script->s4wPathOutLasDir, script->s4wOutPath );
+  rFS_AddDir ( script->s4wPathOutLasDir, L"\\las", 0 );
+
+
+  if ( !script->ss4wExcludeFF )
+  {
+    script->ss4wExcludeFF = r4_malloc_ss4w ( 1 );
+    LPWSTR const s4w = r4_malloc_s4w ( r4_get_count_s4w ( script->s4wOutPath ) + 2 );
+    r4_push_array_s4w_sz ( s4w, L"*", 2 );
+    r4_push_array_s4w_s4w ( s4w, script->s4wOutPath );
+    r4_add_array_ss4w ( script->ss4wExcludeFF, &s4w, 1 );
+  }
+
+  --(script->nRecursive);
+
+
   return rFS_Tree ( script->s4wRun,
           (BOOL (*)(LPWSTR const,  LPCWSTR const, UINT const, LPVOID const))rParse_FileProc,
           (BOOL (*)(LPWSTR const,  LPCWSTR const, LPVOID const))rParse_FolderProc,
@@ -29,9 +75,11 @@ static VOID rScriptFree ( struct ag47_script * const script )
   if ( script->s4wPathTo7Zip ) { r4_free_s4w ( script->s4wPathTo7Zip ); script->s4wPathTo7Zip = NULL; }
   if ( script->ss4wExcludeFF ) { r4_free_ss4w_withsub ( script->ss4wExcludeFF ); script->ss4wExcludeFF = NULL; }
   if ( script->s4uExcludeSizes ) { r4_free_s4u ( script->s4uExcludeSizes ); script->s4uExcludeSizes = NULL; }
+  if ( script->ss4wArchiveFF ) { r4_free_ss4w_withsub ( script->ss4wArchiveFF ); script->ss4wArchiveFF = NULL; }
   if ( script->ss4wLasFF ) { r4_free_ss4w_withsub ( script->ss4wLasFF ); script->ss4wLasFF = NULL; }
   if ( script->ss4wInkFF ) { r4_free_ss4w_withsub ( script->ss4wInkFF ); script->ss4wInkFF = NULL; }
 }
+
 
 static BOOL rScript_CaseName ( struct mem_ptr_txt * const p, LPCSTR const sz )
 { return rMemPtrTxt_CmpCaseWordA ( p, sz ) && rMemPtrTxt_Skip_NoValid ( p, strlen ( sz ) ); }
@@ -329,10 +377,10 @@ static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_pt
   rScript_ParseValName_String ( script, p, &(script->s4wPathToWordconv), "PATH_TO_WORDCONV" ) ||
   rScript_ParseValName_String ( script, p, &(script->s4wPathTo7Zip), "PATH_TO_7ZIP" ) ||
   rScript_ParseValName_Bool ( script, p, &(script->bOutRecreate), "OUT_RECREATE" ) ||
-  rScript_ParseValName_Bool ( script, p, &(script->bArchivesIgnore), "ARCHIVES_IGNORE" ) ||
   rScript_ParseValName_Uint ( script, p, &(script->nRecursive), "RECURSIVE" ) ||
   rScript_ParseValName_Uint ( script, p, &(script->iLasMod), "LAS_MOD" ) ||
   rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wExcludeFF), "EXCLUDE_FF" ) ||
+  rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wArchiveFF), "ARCHIVE_FF" ) ||
   rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wLasFF), "LAS_FF" ) ||
   rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wInkFF), "INK_FF" ) ||
   rScript_ParseValName_VectorOfUints ( script, p, &(script->s4uExcludeSizes), "EXCLUDE_SIZE" ) ||

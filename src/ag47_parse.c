@@ -12,22 +12,69 @@ BOOL rParse_FolderProc ( LPWSTR const s4wPath, LPCWSTR const wszFolderName ,
 BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
         UINT const nFileSize, struct ag47_script * const script )
 {
-  #if 0
-  if ( wszFileName[0] == '~' && wszFileName[1] == '$' ) return 0;
-  const UINT n = r4_get_count_s4w ( s4wOrigin );
-  r4_push_array_s4w_sz ( s4wOrigin, L"\\", 2 );
-  r4_push_array_s4w_sz ( s4wOrigin, wszFileName, 0 );
-  UINT iErr = 0;
-  if ( r4_path_ending_s4w_zip ( s4wPath ) )
+  if ( wszFileName[0] == '~' ) { return TRUE; }
+  // Пропускаем файлы подходящие под шаблон
+  D4ForAll_ss4w ( script->ss4wExcludeFF, i, n1 )
+  { if ( PathMatchSpecW ( s4wPath, script->ss4wExcludeFF[i] ) ||
+          PathMatchSpecW ( wszFileName, script->ss4wExcludeFF[i] ) ) { return TRUE; } }
+
+  // Пропускаем файлы подходящие под размеры
+  if ( script->s4uExcludeSizes )
   {
+    UINT const * const p = script->s4uExcludeSizes;
+    UINT const n1 = r4_get_count_s4u ( p );
+    UINT const n2 = n1 / 2;
+    if ( n1 % 2 && nFileSize >= p[n1-1] ) { return TRUE; }
+    for ( UINT i = 0; i < n2; ++i )
+    {
+      if ( p[i*2+0] <= p[i*2+1] ) // исключены будут файлы в диапозоне
+      { if ( nFileSize >= p[i*2+0] && nFileSize <= p[i*2+1] ) { return TRUE; } }
+      else
+      { if ( nFileSize >= p[i*2+0] || nFileSize <= p[i*2+1] ) { return TRUE; } }
+    }
+  }
+
+  const UINT n = r4_get_count_s4w ( script->s4wOrigin );
+  r4_push_array_s4w_sz ( script->s4wOrigin, L"\\", 2 );
+  r4_push_array_s4w_sz ( script->s4wOrigin, wszFileName, 0 );
+
+  // Архивы
+  if ( r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wArchiveFF ) )
+  {
+    // Пропускаем из за глубины
+    if ( script->nRecursive == 0 ) { return TRUE; }
     const LPWSTR s4wPathTempDir = r4_alloca_s4w ( kPathMax );
-    r4_init_s4w_s4w ( s4wPathTempDir, s4wPathOutTempDir );
+    r4_init_s4w_s4w ( s4wPathTempDir, script->s4wPathOutTempDir );
     rFS_NewRandDir_s4w ( s4wPathTempDir ); // .temp/xxxxxxxx/
-    rFS_Run_7Zip ( s4wPath, s4wPathTempDir ); // path/filename.zip ==> .temp/xxxxxxxx/
-    iErr = rParse_Tree ( s4wPathTempDir, s4wOrigin ); // .temp/xxxxxxxx/ |] path/filename.zip
+    rFS_Run_7Zip ( script, s4wPath, s4wPathTempDir ); // path/filename.zip ==> .temp/xxxxxxxx/
+    --(script->nRecursive);
+    const BOOL b = rFS_Tree ( s4wPath, // .temp/xxxxxxxx/ |] path/filename.zip
+      (BOOL (*)(LPWSTR const,  LPCWSTR const, UINT const, LPVOID const))rParse_FileProc,
+      (BOOL (*)(LPWSTR const,  LPCWSTR const, LPVOID const))rParse_FolderProc,
+      script );
+    ++(script->nRecursive);
     rFS_DeleteTree ( s4wPathTempDir );
+    r4_cut_end_s4w ( script->s4wOrigin, n );
+    return b;
+  }
+  else // Файлы ГИС
+  if ( r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wLasFF ) )
+  {
+    r4_cut_end_s4w ( script->s4wOrigin, n );
+    return TRUE;
+  }
+  else // Файлы Инклинометрии
+  if ( r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wInkFF ) )
+  {
+    r4_cut_end_s4w ( script->s4wOrigin, n );
+    return TRUE;
   }
   else
+  {
+    r4_cut_end_s4w ( script->s4wOrigin, n );
+    return TRUE;
+  }
+  #if 0
   if ( r4_path_ending_s4w_docx ( s4wPath ) )
   {
     const LPWSTR s4wPathTempDir = r4_alloca_s4w ( kPathMax );
@@ -79,32 +126,32 @@ BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
   }
   P_End:
   r4_cut_end_s4w ( s4wOrigin, n );
-  #endif
+
   return FALSE;
+  #endif
 }
 
-BOOL rParse_FolderProc ( LPWSTR const s4wPath, LPCWSTR const wszFolderName ,
+BOOL rParse_FolderProc ( LPWSTR const s4wPath, LPCWSTR const wszFolderName,
         struct ag47_script * const script )
 {
-  #if 0
-  if ( script->ss4wExcludeFF )
-  {
-    script->ss4wExcludeFF = r4_malloc_ss4w ( 1 );
-    LPWSTR const s4w = r4_malloc ( r4_get_count_s4w ( script->s4wOutPath ) + 2 );
-    r4_push_array_s4w_sz ( s4w, L"*" );
-  }
-  else
-  {
-  }
-  if ( _wcsicmp ( wszFolderName, L".ag47" ) == 0 ) { return 0; }
-  const UINT n = r4_get_count_s4w ( s4wOrigin );
-  r4_push_array_s4w_sz ( s4wOrigin, L"\\", 2 );
-  r4_push_array_s4w_sz ( s4wOrigin, wszFolderName, 0 );
-  const UINT iErr = rFS_Tree ( s4wPath, rParse_FileProc, rParse_FolderProc, s4wOrigin );
-  r4_cut_end_s4w ( s4wOrigin, n );
-  return iErr;
-  #endif
+  if ( wszFolderName[0] == '~' ) { return TRUE; }
+  // Пропускаем из за глубины
+  if ( script->nRecursive == 0 ) { return TRUE; }
+  // Пропускаем папки под шаблоном
+  D4ForAll_ss4w ( script->ss4wExcludeFF, i, n1 )
+  { if ( PathMatchSpecW ( s4wPath, script->ss4wExcludeFF[i] ) ||
+          PathMatchSpecW ( wszFolderName, script->ss4wExcludeFF[i] ) ) { return TRUE; } }
 
-  return FALSE;
+  const UINT n = r4_get_count_s4w ( script->s4wOrigin );
+  r4_push_array_s4w_sz ( script->s4wOrigin, L"\\", 2 );
+  r4_push_array_s4w_sz ( script->s4wOrigin, wszFolderName, 0 );
+  --(script->nRecursive);
+  const BOOL b = rFS_Tree ( s4wPath,
+      (BOOL (*)(LPWSTR const,  LPCWSTR const, UINT const, LPVOID const))rParse_FileProc,
+      (BOOL (*)(LPWSTR const,  LPCWSTR const, LPVOID const))rParse_FolderProc,
+      script );
+  ++(script->nRecursive);
+  r4_cut_end_s4w ( script->s4wOrigin, n );
+  return b;
 }
 

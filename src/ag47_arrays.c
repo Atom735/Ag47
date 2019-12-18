@@ -475,6 +475,7 @@ static LPWSTR r4_push_array_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n 
   if ( h->memsz < h->count + n )
   {
     rLog_Error ( L"\t==> Нехватает места для объединения строк [%s] и [%s]\n", s4, wsz );
+    assert ( FALSE );
     return s4;
   }
   else
@@ -635,6 +636,13 @@ static UINT r4_push_path_s4w_sz ( const LPWSTR s4, const LPCWSTR wsz, UINT n )
   return i;
 }
 #define r4_push_path_s4w_s4w(_p_,_w_) r4_push_path_s4w_sz(_p_,_w_,r4_get_count_s4w(_w_)+1)
+
+static BOOL r4_path_match_s4w_by_ss4w ( LPCWSTR const s4w, LPWSTR const * const ss4w )
+{
+  D4ForAll_ss4w ( ss4w, i, n )
+  { if ( PathMatchSpecW ( s4w, ss4w[i] ) ) { return TRUE; } }
+  return FALSE;
+}
 
 static BOOL r4_path_ending_s4w ( const LPCWSTR s4w, LPCWSTR wsz, UINT n )
 {

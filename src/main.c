@@ -1,6 +1,7 @@
 ﻿#include <windows.h>
 #include <shlwapi.h>
 
+#include <assert.h>
 #include <inttypes.h>
 #include <locale.h>
 #include <math.h>
@@ -35,17 +36,6 @@ static _locale_t g_locale_C = NULL;
 
 INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, INT nShowCmd )
 {
-  LPCWSTR wszIn = L"F:\\ARGilyazeev\\github\\Ag47";
-  LPCWSTR wszOut = L"*F:\\ARGilyazeev\\github\\Ag47";
-
-  rLog ( L"%hs\r\n", PathMatchSpecW ( wszIn, wszOut ) ? "TRUE" : "FALSE" );
-  wszOut = L"*\\.ag47";
-  rLog ( L"%hs\r\n", PathMatchSpecW ( wszIn, wszOut ) ? "TRUE" : "FALSE" );
-  wszOut = L".\\.ag47";
-  rLog ( L"%hs\r\n", PathMatchSpecW ( wszIn, wszOut ) ? "TRUE" : "FALSE" );
-  wszOut = L"*ag47";
-  rLog ( L"%hs\r\n", PathMatchSpecW ( wszIn, wszOut ) ? "TRUE" : "FALSE" );
-
   rLocalsInit ( );
   g_locale_C = _create_locale ( LC_ALL, "C" );
   AllocConsole ( );
