@@ -19,12 +19,12 @@ static LPWSTR s4wPathOutLasDir = NULL;
 static _locale_t g_locale_C = NULL;
 
 
+#include "ag47_settings.h"
 #include "ag47_misc.c"
 #include "ag47_log.c"
 #include "ag47_map.c"
 #include "ag47_arrays.c"
 #include "ag47_fs.c"
-#include "ag47_settings.h"
 #include "ag47_parse_docx.c"
 #include "ag47_parse_txt.c"
 #include "ag47_parse_las.c"

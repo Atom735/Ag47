@@ -15,7 +15,7 @@ static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
 static BOOL rScriptRun ( struct ag47_script * const script )
 {
   rLog ( L" === === === Выполнение сценария === === === \r\n" );
-  return TRUE;
+  return rFS_Tree ( script->s4wRun, rParse_FileProc, rParse_FolderProc, script  );
 }
 
 static VOID rScriptFree ( struct ag47_script * const script )
@@ -415,9 +415,8 @@ static UINT rScriptRunMem ( BYTE const * const pBuf, UINT const nSize )
 static UINT rScriptRunFile ( LPCWSTR const wszPath )
 {
   struct file_map fm;
-  UINT iErr = 0;
-  if ( ( iErr = rFS_FileMapOpen ( &fm, wszPath ) ) ) { return iErr; }
-  iErr = rScriptRunMem ( fm.pData, fm.nSize );
+  if ( !rFS_FileMapOpen ( &fm, wszPath ) ) { return -1; }
+  UINT const iErr = rScriptRunMem ( fm.pData, fm.nSize );
   rFS_FileMapClose ( &fm );
   return iErr;
 }

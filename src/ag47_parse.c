@@ -3,25 +3,21 @@
 
 
 
-UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
-        const UINT nFileSize, const LPWSTR s4wOrigin );
-UINT rParse_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName,
-        const LPWSTR s4wOrigin );
+BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
+        UINT const nFileSize, struct ag47_script * const script );
+BOOL rParse_FolderProc ( LPWSTR const s4wPath, LPCWSTR const wszFolderName ,
+        struct ag47_script * const script );
 
-static UINT rParse_Tree ( const LPWSTR s4wPath, const LPWSTR s4wOrigin )
-{
-  return rFS_Tree ( s4wPath, rParse_FileProc, rParse_FolderProc, s4wOrigin  );
-}
 
-UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
-        const UINT nFileSize, const LPWSTR s4wOrigin )
+BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
+        UINT const nFileSize, struct ag47_script * const script )
 {
+  #if 0
   if ( wszFileName[0] == '~' && wszFileName[1] == '$' ) return 0;
   const UINT n = r4_get_count_s4w ( s4wOrigin );
   r4_push_array_s4w_sz ( s4wOrigin, L"\\", 2 );
   r4_push_array_s4w_sz ( s4wOrigin, wszFileName, 0 );
   UINT iErr = 0;
-  #if 0
   if ( r4_path_ending_s4w_zip ( s4wPath ) )
   {
     const LPWSTR s4wPathTempDir = r4_alloca_s4w ( kPathMax );
@@ -77,25 +73,34 @@ UINT rParse_FileProc ( const LPWSTR s4wPath, const LPCWSTR wszFileName,
     rParse_Las ( s4wPath, s4wOrigin, wszFileName );
   }
   else
-  #endif
   if ( r4_path_ending_s4w_dbf ( s4wPath ) )
   {
     rParse_DBF ( s4wPath, s4wOrigin, wszFileName );
   }
   P_End:
   r4_cut_end_s4w ( s4wOrigin, n );
-  return iErr;
+  #endif
+  return FALSE;
 }
 
-UINT rParse_FolderProc ( const LPWSTR s4wPath, const LPCWSTR wszFolderName,
-        const LPWSTR s4wOrigin )
+BOOL rParse_FolderProc ( LPWSTR const s4wPath, LPCWSTR const wszFolderName ,
+        struct ag47_script * const script )
 {
-  if ( _wcsicmp_l(wszFolderName,L".ag47",g_locale_C) == 0 ) { return 0; }
+  #if 0
+  if ( script->ss4wExcludeFF )
+  {
+  }
+  else
+  {
+  }
+  if ( _wcsicmp ( wszFolderName, L".ag47" ) == 0 ) { return 0; }
   const UINT n = r4_get_count_s4w ( s4wOrigin );
   r4_push_array_s4w_sz ( s4wOrigin, L"\\", 2 );
   r4_push_array_s4w_sz ( s4wOrigin, wszFolderName, 0 );
   const UINT iErr = rFS_Tree ( s4wPath, rParse_FileProc, rParse_FolderProc, s4wOrigin );
   r4_cut_end_s4w ( s4wOrigin, n );
   return iErr;
+  #endif
+  return FALSE;
 }
 
