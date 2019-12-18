@@ -24,6 +24,17 @@
     По умолчанию {".ag47"} - создаёт папку в рабочей папке
   */
   LPWSTR                s4wOutPath;
+  /*  PATH_TO_WORDCONV
+      Путь к программе wordconv из офисного пакета Microsoft
+      По умолчанию {NULL} - Поиск в Program Files
+  */
+  LPWSTR                s4wPathToWordconv;
+  /*  PATH_TO_7ZIP
+      Путь к программе архиватору 7zip
+      По умолчанию {NULL} - Поиск в Program Files
+  */
+  LPWSTR                s4wPathTo7Zip;
+
   /*  OUT_RECREATE
     Флаг пересоздания папки для выхода
     По умолчанию {FALSE} - не отчищает папку если она существует
@@ -31,9 +42,11 @@
   BOOL                  bOutRecreate;
   /*  EXCLUDE_FF
     Шаблоны файлов, которые будут исключены из поиска
-    По умолчанию {[".ag47"]}
+    По умолчанию {NULL} - Исключает папку OUT_PATH
     Возможные значения:
+      {NULL}            - Вернуть значение поумолчанию
       {[]}              - Отключить исключение файлов ( Ноль элементов )
+
     Папки . и .. будут всегда исключены
   */
   LPWSTR              * ss4wExcludeFF;
@@ -134,6 +147,7 @@ enum
   kErr_Script_EqValue,
   kErr_Script_ErrSymbol,
   kErr_Script_ValueName,
+  kErr_Script_ArraySeparator,
 };
 
 LPCWSTR const g7ErrStrScript[] =
@@ -144,6 +158,7 @@ LPCWSTR const g7ErrStrScript[] =
   [kErr_Script_EqValue]                 = L"Ошибка синтаксиса, отсуствует символ \'=\'",
   [kErr_Script_ErrSymbol]               = L"Ошибка синтаксиса, непредвиденный символ",
   [kErr_Script_ValueName]               = L"Неизвестное название переменной",
+  [kErr_Script_ArraySeparator]          = L"Ошибка синтаксиса, отсутсвует разделитель \',\'",
 };
 
 static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
@@ -157,6 +172,7 @@ static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
 #define rLogScript(_s_,_i_) rLogScript_(__FILE__,__LINE__,_s_,_i_)
 
 
+
 static BOOL rScript_CaseName ( struct mem_ptr_txt * const p, LPCSTR const sz )
 { return rMemPtrTxt_CmpCaseWordA ( p, sz ) && rMemPtrTxt_Skip_NoValid ( p, strlen ( sz ) ); }
 
@@ -166,13 +182,26 @@ static BOOL rScript_ParseVal_String ( struct ag47_script * const script,
   if ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) && ( *(p->p) == '=' ) &&
        rMemPtrTxt_Skip_NoValid ( p, 1 ) && rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
   {
-    if ( rScript_CaseName ( p, "NULL" ) || *(p->p) == ';' ) { if ( *ps4w ) { r4_free_s4w ( *ps4w ); *ps4w = NULL; } }
+    if ( *ps4w ) { r4_free_s4w ( *ps4w ); *ps4w = NULL; }
+    if ( rScript_CaseName ( p, "NULL" ) || *(p->p) == ';' ) { }
     else
     if ( *(p->p) == '\'' )
     {
       rMemPtrTxt_Skip_NoValid ( p, 1 );
       UINT i = 0;
       for ( ; i < p->n; ++i ) { if ( p->p[i] == '\'' ) { break; } }
+      UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
+      *ps4w = r4_malloc_s4w ( iW+1 );
+      r4_get_count_s4w ( (*ps4w) ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, *ps4w, iW+1 );
+      (*ps4w)[iW] = 0;
+      rMemPtrTxt_Skip_NoValid ( p, i+1 );
+    }
+    else
+    if ( *(p->p) == '\"' )
+    {
+      rMemPtrTxt_Skip_NoValid ( p, 1 );
+      UINT i = 0;
+      for ( ; i < p->n; ++i ) { if ( p->p[i] == '\"' ) { break; } }
       UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
       *ps4w = r4_malloc_s4w ( iW+1 );
       r4_get_count_s4w ( (*ps4w) ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, *ps4w, iW+1 );
@@ -237,6 +266,74 @@ static BOOL rScript_ParseVal_Uint ( struct ag47_script * const script,
   { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
 }
 
+static BOOL rScript_ParseVal_VectorOfStrings ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, LPWSTR ** const pss4w )
+{
+  if ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) && ( *(p->p) == '=' ) &&
+       rMemPtrTxt_Skip_NoValid ( p, 1 ) && rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
+  {
+    if ( *pss4w ) { r4_free_ss4w_withsub ( *pss4w ); *pss4w = NULL; }
+    if ( rScript_CaseName ( p, "NULL" ) || *(p->p) == ';' ) { }
+    else
+    if ( *(p->p) == '[' && rMemPtrTxt_Skip_NoValid ( p, 1) )
+    {
+      *pss4w = r4_malloc_ss4w ( 4 );
+      while ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
+      {
+        if ( *(p->p) == ']' && rMemPtrTxt_Skip_NoValid ( p, 1) ) { break; }
+        else
+        if ( rScript_CaseName ( p, "NULL" )  )
+        {
+          LPVOID q = NULL;
+          *pss4w = r4_add_array_s4p ( *pss4w, &q, 1 );
+        }
+        else
+        if ( *(p->p) == '\'' && rMemPtrTxt_Skip_NoValid ( p, 1) )
+        {
+          UINT i = 0;
+          for ( ; i < p->n; ++i ) { if ( p->p[i] == '\'' ) { break; } }
+          UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
+          LPWSTR s4w = r4_malloc_s4w ( iW+1 );
+          r4_get_count_s4w ( s4w ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, s4w, iW+1 );
+          s4w[iW] = 0;
+          *pss4w = r4_add_array_s4p ( *pss4w, &s4w, 1 );
+          rMemPtrTxt_Skip_NoValid ( p, i+1 );
+        }
+        else
+        if ( *(p->p) == '\"' && rMemPtrTxt_Skip_NoValid ( p, 1) )
+        {
+          UINT i = 0;
+          for ( ; i < p->n; ++i ) { if ( p->p[i] == '\"' ) { break; } }
+          UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
+          LPWSTR s4w = r4_malloc_s4w ( iW+1 );
+          r4_get_count_s4w ( s4w ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, s4w, iW+1 );
+          s4w[iW] = 0;
+          *pss4w = r4_add_array_s4p ( *pss4w, &s4w, 1 );
+          rMemPtrTxt_Skip_NoValid ( p, i+1 );
+        }
+        else
+        { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+        // ccc
+        rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+        if ( *(p->p) == ',' && rMemPtrTxt_Skip_NoValid ( p, 1 ) ) { continue; }
+        else
+        if ( *(p->p) == ']' && rMemPtrTxt_Skip_NoValid ( p, 1 ) ) { break; }
+        else
+        { rLogScript ( script, kErr_Script_ArraySeparator ); return FALSE; }
+      }
+    }
+    else
+    { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+    ////cccc
+    rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+    if ( *(p->p) == ';' ) { return rMemPtrTxt_Skip_NoValid ( p, 1 ); }
+    else
+    { rLogScript ( script, kErr_Script_EndOfValue ); return FALSE; }
+  }
+  else
+  { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
+}
+
 static BOOL rScript_ParseValName_String ( struct ag47_script * const script,
         struct mem_ptr_txt * const p, LPWSTR * const ps4w, LPCSTR const sz )
 {
@@ -273,14 +370,42 @@ static BOOL rScript_ParseValName_Uint ( struct ag47_script * const script,
   return FALSE;
 }
 
+
+static BOOL rScript_ParseValName_VectorOfStrings ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, LPWSTR ** const pss4w, LPCSTR const sz )
+{
+  if ( rScript_CaseName ( p, sz ) )
+  {
+    const BOOL b = rScript_ParseVal_VectorOfStrings ( script, p, pss4w );
+    if ( b )
+    {
+      if ( *pss4w )
+      {
+        rLog ( L"script %-16hs %-12hs == %u\r\n", sz, "STRING[]", r4_get_count_ss4w (*pss4w) );
+        D4ForAll_ss4w ( *pss4w, i, n ) { rLog ( L"script %-16hs % 12u == %s\r\n", sz, i, (*pss4w)[i] ); }
+      }
+      else
+      { rLog ( L"script %-16hs %-12hs => NULL\r\n", sz, "STRING[]" ); }
+    }
+    return b;
+  }
+  return FALSE;
+}
+
 static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_ptr_txt * const p )
 {
   return
   rScript_ParseValName_String ( script, p, &(script->s4wRun), "RUN" ) ||
   rScript_ParseValName_String ( script, p, &(script->s4wOutPath), "OUT_PATH" ) ||
+  rScript_ParseValName_String ( script, p, &(script->s4wPathToWordconv), "PATH_TO_WORDCONV" ) ||
+  rScript_ParseValName_String ( script, p, &(script->s4wPathTo7Zip), "PATH_TO_7ZIP" ) ||
   rScript_ParseValName_Bool ( script, p, &(script->bOutRecreate), "OUT_RECREATE" ) ||
   rScript_ParseValName_Bool ( script, p, &(script->bArchivesIgnore), "ARCHIVES_IGNORE" ) ||
   rScript_ParseValName_Uint ( script, p, &(script->nRecursive), "RECURSIVE" ) ||
+  rScript_ParseValName_Uint ( script, p, &(script->iLasMod), "LAS_MOD" ) ||
+  rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wExcludeFF), "EXCLUDE_FF" ) ||
+  rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wLasFF), "LAS_FF" ) ||
+  rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wInkFF), "INK_FF" ) ||
   ( rLogScript ( script, kErr_Script_ValueName ), FALSE );
 }
 
@@ -297,7 +422,7 @@ static BOOL rScript_ParseOne ( struct ag47_script * const script, struct mem_ptr
         {
           if ( (p->p)[1] == '/' ) { return rMemPtrTxt_Skip_ToBeginNewLine ( p ); }
           else
-          if ( (p->p)[1] == '*' ) {  return rMemPtrTxt_Skip_ToFirstCmpArrayA ( p, "*/" ) >= 2 ?
+          if ( (p->p)[1] == '*' && rMemPtrTxt_Skip_NoValid ( p, 2) ) {  return rMemPtrTxt_Skip_ToFirstCmpArrayA ( p, "*/" ) >= 2 ?
                   rMemPtrTxt_Skip_NoValid ( p, 2) : FALSE; }
           else { rLogScript ( script, kErr_Script_ErrSymbol ); return FALSE; }
         }

@@ -1,4 +1,11 @@
-﻿    RUN         =
+﻿EXCLUDE_FF=;
+EXCLUDE_FF=[   ];
+EXCLUDE_FF=NULL;
+EXCLUDE_FF=[NULL];
+EXCLUDE_FF=[NULL,'HelloWOrld',"Привет мир!"];
+EXCLUDE_FF=['А что если не мир?!',NULL,"Привет мир!"];
+
+    RUN         =
 
 
     'ЫHжeдlElo World!ЙЙA'
@@ -19,9 +26,12 @@
 
 // zxczx
 
-OUT_PATH = '.ag47';
+OUT_PATH = ".ag47";
 OUT_RECREATE=TRUE;
 
 RECURSIVE    = 1;
 
 ARCHIVES_IGNORE = TRUE;
+
+PATH_TO_WORDCONV=NULL;PATH_TO_7ZIP=NULL;
+
