@@ -414,6 +414,24 @@ static LPVOID * r4_realloc_s4p ( LPVOID * const p, UINT n )
   r4_free_s4p ( p );
   return pNew;
 }
+
+static UINT * r4_malloc_copy_s4u ( UINT const * const p, UINT n )
+{
+  struct s4p_head const * const pH = D4GetPtrHead_s4u(p);
+  if ( n <= pH->count ) { n = pH->count * 2; }
+  UINT * const pNew = r4_malloc_s4u ( n );
+  r4_get_count_s4u ( pNew ) = pH->count;
+  memcpy ( pNew, p, pH->count * sizeof(UINT) );
+  return pNew;
+}
+static UINT * r4_realloc_s4u ( UINT * const p, UINT n )
+{
+  printf ( "Realloc (%p,%u)\n", p, n );
+  UINT * const pNew = r4_malloc_copy_s4u ( p, n );
+  r4_free_s4u ( p );
+  return pNew;
+}
+
 /*
   Цикл по всем элементам массива
   _p_ -- вектор
@@ -495,6 +513,25 @@ static LPVOID * r4_add_array_s4p ( LPVOID * const s4p, LPVOID const * const pEle
     memcpy ( s4p + pH->count, pElement, nCount*sizeof(LPVOID) );
     pH->count += nCount;
     return s4p;
+  }
+}
+static LPWSTR* r4_add_array_ss4w ( LPWSTR * const ss4w, LPWSTR const * const pArray, UINT const nCount )
+{
+  return (LPWSTR*) r4_add_array_s4p ( (LPVOID*)ss4w, (LPVOID*)pArray, nCount );
+}
+
+static UINT* r4_add_array_s4u ( UINT * const s4u, UINT const * const pElement, UINT const nCount )
+{
+  struct s4p_head * const pH = D4GetPtrHead_s4u(s4u);
+  if ( pH->memsz < pH->count + nCount )
+  {
+    return r4_add_array_s4u ( r4_realloc_s4u ( s4u, pH->memsz*2 ), pElement, nCount );
+  }
+  else
+  {
+    memcpy ( s4u + pH->count, pElement, nCount*sizeof(LPVOID) );
+    pH->count += nCount;
+    return s4u;
   }
 }
 
