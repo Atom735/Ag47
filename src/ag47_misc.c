@@ -193,13 +193,13 @@ static UINT rMemPtrTxt_Skip_ToBeginNewLine ( struct mem_ptr_txt * const p )
 
 
 /* Сравнивает память и слово, возвращает длину слова при совпадении */
-static BOOL rMemPtrTxt_CmpArrayA ( struct mem_ptr_txt * const p, LPCSTR const sz )
+static UINT rMemPtrTxt_CmpArrayA ( struct mem_ptr_txt * const p, LPCSTR const sz )
 { return rStrCmpArrayAA ( p->p, p->n, sz ); }
 /* Сравнивает память и слово, проверяя границу, возвращает длину слова при совпадении */
-static BOOL rMemPtrTxt_CmpWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
+static UINT rMemPtrTxt_CmpWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
 { return rStrCmpWordAA ( p->p, p->n, sz ); }
 /* Сравнивает память и слово игнорируя регистр, проверяя границу, возвращает длину слова при совпадении */
-static BOOL rMemPtrTxt_CmpCaseWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
+static UINT rMemPtrTxt_CmpCaseWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
 { return rStrCmpCaseWordAA ( p->p, p->n, sz ); }
 
 /* Пропускает все байты доходя до слова, возвращает количество оставшихся байт */
