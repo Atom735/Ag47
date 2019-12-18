@@ -5,6 +5,14 @@ EXCLUDE_FF=[NULL];
 EXCLUDE_FF=[NULL,'HelloWOrld',"Привет мир!"];
 EXCLUDE_FF=['А что если не мир?!',NULL,"Привет мир!"];
 
+
+EXCLUDE_SIZE   = ;
+EXCLUDE_SIZE   = NULL;
+EXCLUDE_SIZE   = [];
+EXCLUDE_SIZE   = [0];
+EXCLUDE_SIZE   = [123123];
+EXCLUDE_SIZE   = [1,2,3,4,5,6,7,8,9];
+
     RUN         =
 
 

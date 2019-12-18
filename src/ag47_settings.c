@@ -52,11 +52,18 @@
   LPWSTR              * ss4wExcludeFF;
   /*  EXCLUDE_SIZE
     Размеры файлов, которые будут исключены из поиска
-    По умолчанию {[0,0]}
+    По умолчанию {NULL} - отключает исключение по размерам
+    Задаётся парами чисел, если чисел нечётное количество,
+    то также будут исключены все файлы превышающие последнее число
     Если первое значение меньше второго, то исключены будут файлы в диапозоне
     Иначе исключены будут файлы вне диапозона
+    Например:
+      {[1024]}          - Исключает все файл, размером более одного килобайта
+      {[1024,0]}        - Аналогично предудщему
+      {[0,1024,1048576]}- Исключает файлы меньше одного килобайта и больше одного мегабайта
+      {[1048576,1024]}  - Аналогично предудщему
   */
-  UINT                  nExcludeSizes[2];
+  UINT                * s4uExcludeSizes;
   /*  RECURSIVE
     Максимальная глубина поиска по подпапкам и архивам
     По умолчанию {0}
@@ -69,7 +76,7 @@
     Игнорировать ли архивы
     По умолчанию {FALSE}
   */
-  UINT                  bArchivesIgnore;
+  BOOL                  bArchivesIgnore;
   // === LAS === === === === === === === === === === === === === === === === === === === === === ===
   /*  LAS_FF
     Шаблоны поиска LAS файлов
@@ -284,8 +291,8 @@ static BOOL rScript_ParseVal_VectorOfStrings ( struct ag47_script * const script
         else
         if ( rScript_CaseName ( p, "NULL" )  )
         {
-          LPVOID q = NULL;
-          *pss4w = r4_add_array_s4p ( *pss4w, &q, 1 );
+          LPWSTR q = NULL;
+          *pss4w = r4_add_array_ss4w ( *pss4w, &q, 1 );
         }
         else
         if ( *(p->p) == '\'' && rMemPtrTxt_Skip_NoValid ( p, 1) )
@@ -296,7 +303,7 @@ static BOOL rScript_ParseVal_VectorOfStrings ( struct ag47_script * const script
           LPWSTR s4w = r4_malloc_s4w ( iW+1 );
           r4_get_count_s4w ( s4w ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, s4w, iW+1 );
           s4w[iW] = 0;
-          *pss4w = r4_add_array_s4p ( *pss4w, &s4w, 1 );
+          *pss4w = r4_add_array_ss4w ( *pss4w, &s4w, 1 );
           rMemPtrTxt_Skip_NoValid ( p, i+1 );
         }
         else
@@ -308,12 +315,60 @@ static BOOL rScript_ParseVal_VectorOfStrings ( struct ag47_script * const script
           LPWSTR s4w = r4_malloc_s4w ( iW+1 );
           r4_get_count_s4w ( s4w ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, s4w, iW+1 );
           s4w[iW] = 0;
-          *pss4w = r4_add_array_s4p ( *pss4w, &s4w, 1 );
+          *pss4w = r4_add_array_ss4w ( *pss4w, &s4w, 1 );
           rMemPtrTxt_Skip_NoValid ( p, i+1 );
         }
         else
         { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
         // ccc
+        rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+        if ( *(p->p) == ',' && rMemPtrTxt_Skip_NoValid ( p, 1 ) ) { continue; }
+        else
+        if ( *(p->p) == ']' && rMemPtrTxt_Skip_NoValid ( p, 1 ) ) { break; }
+        else
+        { rLogScript ( script, kErr_Script_ArraySeparator ); return FALSE; }
+      }
+    }
+    else
+    { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+    ////cccc
+    rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+    if ( *(p->p) == ';' ) { return rMemPtrTxt_Skip_NoValid ( p, 1 ); }
+    else
+    { rLogScript ( script, kErr_Script_EndOfValue ); return FALSE; }
+  }
+  else
+  { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
+}
+
+
+static BOOL rScript_ParseVal_VectorOfUints ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, UINT ** const ps4u )
+{
+  if ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) && ( *(p->p) == '=' ) &&
+       rMemPtrTxt_Skip_NoValid ( p, 1 ) && rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
+  {
+    if ( *ps4u ) { r4_free_s4u ( *ps4u ); *ps4u = NULL; }
+    if ( rScript_CaseName ( p, "NULL" ) || *(p->p) == ';' ) { }
+    else
+    if ( *(p->p) == '[' && rMemPtrTxt_Skip_NoValid ( p, 1) )
+    {
+      *ps4u = r4_malloc_s4u ( 4 );
+      while ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
+      {
+        UINT u = 0;
+        if ( *(p->p) == ']' && rMemPtrTxt_Skip_NoValid ( p, 1) ) { break; }
+        else
+        if ( rScript_CaseName ( p, "NULL" ) || rScript_CaseName ( p, "FALSE" ) ||
+                rScript_CaseName ( p, "NO" ) ) { u = 0; }
+        else
+        if ( rScript_CaseName ( p, "TRUE" ) || rScript_CaseName ( p, "YES" ) ) { u = 1; }
+        else
+        if ( rMemPtrTxt_GetUint ( p, &u ) ) { }
+        else
+        { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+        // ccc
+        *ps4u = r4_add_array_s4u ( *ps4u, &u, 1 );
         rMemPtrTxt_Skip_ToFirstNonSpace ( p );
         if ( *(p->p) == ',' && rMemPtrTxt_Skip_NoValid ( p, 1 ) ) { continue; }
         else
@@ -392,6 +447,27 @@ static BOOL rScript_ParseValName_VectorOfStrings ( struct ag47_script * const sc
   return FALSE;
 }
 
+static BOOL rScript_ParseValName_VectorOfUints ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, UINT ** const ps4u, LPCSTR const sz )
+{
+  if ( rScript_CaseName ( p, sz ) )
+  {
+    const BOOL b = rScript_ParseVal_VectorOfUints ( script, p, ps4u );
+    if ( b )
+    {
+      if ( *ps4u )
+      {
+        rLog ( L"script %-16hs %-12hs == %u\r\n", sz, "UINT[]", r4_get_count_s4u (*ps4u) );
+        D4ForAll_s4u ( *ps4u, i, n ) { rLog ( L"script %-16hs % 12u == %u (0x%x)\r\n", sz, i, (*ps4u)[i], (*ps4u)[i] ); }
+      }
+      else
+      { rLog ( L"script %-16hs %-12hs => NULL\r\n", sz, "UINT[]" ); }
+    }
+    return b;
+  }
+  return FALSE;
+}
+
 static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_ptr_txt * const p )
 {
   return
@@ -406,6 +482,7 @@ static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_pt
   rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wExcludeFF), "EXCLUDE_FF" ) ||
   rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wLasFF), "LAS_FF" ) ||
   rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wInkFF), "INK_FF" ) ||
+  rScript_ParseValName_VectorOfUints ( script, p, &(script->s4uExcludeSizes), "EXCLUDE_SIZE" ) ||
   ( rLogScript ( script, kErr_Script_ValueName ), FALSE );
 }
 
