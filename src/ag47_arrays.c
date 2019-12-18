@@ -483,6 +483,20 @@ static VOID* r4_add_array_s4s ( VOID * const s4s, VOID const * const pElement, c
   }
 }
 
+static LPVOID * r4_add_array_s4p ( LPVOID * const s4p, LPVOID const * const pElement, const UINT nCount )
+{
+  struct s4p_head * const pH = D4GetPtrHead_s4p(s4p);
+  if ( pH->memsz < pH->count + nCount )
+  {
+    return r4_add_array_s4p ( r4_realloc_s4p ( s4p, pH->memsz*2 ), pElement, nCount );
+  }
+  else
+  {
+    memcpy ( s4p + pH->count, pElement, nCount*sizeof(LPVOID) );
+    pH->count += nCount;
+    return s4p;
+  }
+}
 
 
 /*
@@ -548,6 +562,16 @@ static LPCWSTR r4_search_template_wsz ( LPCWSTR wszS, LPCWSTR wszT, const BOOL b
         else return NULL;
       }
   }
+}
+
+
+static VOID r4_free_ss4w_withsub ( LPWSTR * ss4w )
+{
+  D4ForAll_ss4w ( ss4w, i, n )
+  {
+    if ( ss4w[i] ) { r4_free_s4w ( ss4w[i] ); }
+  }
+  r4_free_ss4w ( ss4w );
 }
 
 #define r4_icmp_s4w(_p_,_w_,_n_) ( _wcsnicmp_l ( _p_, _w_, _n_, g_locale_C ) == 0 )
