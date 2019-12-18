@@ -37,10 +37,12 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
   rLocalsInit ( );
   g_locale_C = _create_locale ( LC_ALL, "C" );
   AllocConsole ( );
-  g_s4wPathToWordConv = r4_alloca_s4w ( PATH_MAX );
-  g_s4wPathTo7Zip = r4_alloca_s4w ( PATH_MAX );
-  rFS_SearchExe ( );
-  return rScriptRunFile ( L".ag47-script" );
+  const UINT iErr = rScriptRunFile ( L".ag47-script" );
+  rLog ( NULL );
+  rParse_Las_Log ( NULL );
+  _free_locale ( g_locale_C );
+  rLocalsFree ( );
+  return iErr;
   #if 0
   s4wPathOut = r4_alloca_init_ex_s4w ( L"\\\\?\\", kPathMax );
   rFS_GetCurrentDirectory_s4w ( s4wPathOut );
@@ -68,6 +70,5 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
 
   _free_locale ( g_locale_C );
   rLocalsFree ( );
-  return iErr;
   #endif
 }

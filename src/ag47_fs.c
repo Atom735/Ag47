@@ -137,61 +137,61 @@ static UINT rFS_Tree ( const LPWSTR s4wPath,
 
 
 /*
-  Поиск вспомогательных программ
-  путь к [7Zip] будет записан в [g_s4wPathTo7Zip]
-  путь к [WordConv] будет записан в [g_s4wPathToWordConv]
+  Поиск вспомогательной программы wordconv
 */
-static UINT rFS_SearchExe ( )
+static BOOL rFS_SearchExe_Wordconv ( LPWSTR const s4w )
 {
   WIN32_FIND_DATA ffd;
+  const LPCWSTR wsz = L"C:/Program Files (x86)/Microsoft Office/Office*";
+  const HANDLE hFind = FindFirstFile ( wsz, &ffd );
+  if ( hFind == INVALID_HANDLE_VALUE )
   {
-    const LPCWSTR wsz = L"C:/Program Files (x86)/Microsoft Office/Office*";
-    const HANDLE hFind = FindFirstFile ( wsz, &ffd );
-    if ( hFind == INVALID_HANDLE_VALUE )
-    {
-      rLog_Error_WinAPI ( FindFirstFile, GetLastError(), L"%s\n", wsz );
-      rLog_Error ( L"Невозможно найти папку с установленным [MS Office]\n" );
-      FindClose ( hFind );
-      return __LINE__;
-    }
-    do
-    {
-      r4_cut_end_s4w ( g_s4wPathToWordConv, 0 );
-      r4_push_array_s4w_sz ( g_s4wPathToWordConv, L"C:/Program Files (x86)/Microsoft Office/", 0 );
-      r4_push_array_s4w_sz ( g_s4wPathToWordConv, ffd.cFileName, 0 );
-      r4_push_array_s4w_sz ( g_s4wPathToWordConv, L"/wordconv.exe", 0 );
-      WIN32_FIND_DATA _ffd;
-      const HANDLE _hFind = FindFirstFile ( g_s4wPathToWordConv, &_ffd );
-      if ( _hFind != INVALID_HANDLE_VALUE )
-      {
-        rLog ( L"!INFO: [wordconv.exe] найден по пути: %s\n", g_s4wPathToWordConv );
-        FindClose ( _hFind );
-        FindClose ( hFind );
-        goto P_7Zip;
-      }
-    } while ( FindNextFile ( hFind, &ffd ) );
+    rLog_Error_WinAPI ( FindFirstFile, GetLastError(), L"%s\r\n", wsz );
+    rLog_Error ( L"Невозможно найти папку с установленным [MS Office]\r\n" );
     FindClose ( hFind );
-    rLog_Error ( L"Невозможно найти [wordconv.exe]\n" );
-    r4_cut_end_s4w ( g_s4wPathToWordConv, 0 );
-    return __LINE__;
+    return FALSE;
   }
-  P_7Zip:
+  do
   {
-    r4_cut_end_s4w ( g_s4wPathTo7Zip, 0 );
-    r4_push_array_s4w_sz ( g_s4wPathTo7Zip, L"C:/Program Files/7-Zip/7z.exe", 0 );
-    const HANDLE hFind = FindFirstFile ( g_s4wPathTo7Zip, &ffd );
-    if ( hFind == INVALID_HANDLE_VALUE )
+    r4_cut_end_s4w ( s4w, 0 );
+    r4_push_array_s4w_sz ( s4w, L"C:/Program Files (x86)/Microsoft Office/", 0 );
+    r4_push_array_s4w_sz ( s4w, ffd.cFileName, 0 );
+    r4_push_array_s4w_sz ( s4w, L"/wordconv.exe", 0 );
+    WIN32_FIND_DATA _ffd;
+    const HANDLE _hFind = FindFirstFile ( s4w, &_ffd );
+    if ( _hFind != INVALID_HANDLE_VALUE )
     {
-      rLog_Error_WinAPI ( FindFirstFile, GetLastError(), L"%s\n", g_s4wPathTo7Zip );
-      rLog_Error ( L"Невозможно найти [7z.exe], возможно не установлен [7zip]\n" );
+      FindClose ( _hFind );
       FindClose ( hFind );
-      r4_cut_end_s4w ( g_s4wPathTo7Zip, 0 );
-      return __LINE__;
+      return TRUE;
     }
-    rLog ( L"!INFO: [7z.exe] найден по пути: %s\n", g_s4wPathTo7Zip );
+  } while ( FindNextFile ( hFind, &ffd ) );
+  FindClose ( hFind );
+  rLog_Error ( L"Невозможно найти [wordconv.exe]\r\n" );
+  r4_cut_end_s4w ( s4w, 0 );
+  return FALSE;
+}
+
+/*
+  Поиск вспомогательной программы wordconv
+*/
+static BOOL rFS_SearchExe_7Zip ( LPWSTR const s4w )
+{
+  WIN32_FIND_DATA ffd;
+  r4_cut_end_s4w ( s4w, 0 );
+  r4_push_array_s4w_sz ( s4w, L"C:/Program Files/7-Zip/7z.exe", 0 );
+  const HANDLE hFind = FindFirstFile ( s4w, &ffd );
+  if ( hFind == INVALID_HANDLE_VALUE )
+  {
+    rLog_Error_WinAPI ( FindFirstFile, GetLastError(), L"%s\r\n", s4w );
+    rLog_Error ( L"Невозможно найти [7z.exe], возможно не установлен [7zip]\r\n" );
     FindClose ( hFind );
+    r4_cut_end_s4w ( s4w, 0 );
+    return FALSE;
   }
-  return 0;
+  rLog ( L"!INFO: [7z.exe] найден по пути: %s\r\n", s4w );
+  FindClose ( hFind );
+  return TRUE;
 }
 /*
   Создаёт уникальную временную папку

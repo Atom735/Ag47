@@ -1,4 +1,6 @@
 ﻿
+
+
 static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
         struct ag47_script * const script, UINT const iErr )
 {
@@ -10,6 +12,23 @@ static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
 #define rLogScript(_s_,_i_) rLogScript_(__FILE__,__LINE__,_s_,_i_)
 
 
+static BOOL rScriptRun ( struct ag47_script * const script )
+{
+  rLog ( L" === === === Выполнение сценария === === === \r\n" );
+  return TRUE;
+}
+
+static VOID rScriptFree ( struct ag47_script * const script )
+{
+  if ( script->s4wRun ) { r4_free_s4w ( script->s4wRun ); script->s4wRun = NULL; }
+  if ( script->s4wOutPath ) { r4_free_s4w ( script->s4wOutPath ); script->s4wOutPath = NULL; }
+  if ( script->s4wPathToWordconv ) { r4_free_s4w ( script->s4wPathToWordconv ); script->s4wPathToWordconv = NULL; }
+  if ( script->s4wPathTo7Zip ) { r4_free_s4w ( script->s4wPathTo7Zip ); script->s4wPathTo7Zip = NULL; }
+  if ( script->ss4wExcludeFF ) { r4_free_ss4w_withsub ( script->ss4wExcludeFF ); script->ss4wExcludeFF = NULL; }
+  if ( script->s4uExcludeSizes ) { r4_free_s4u ( script->s4uExcludeSizes ); script->s4uExcludeSizes = NULL; }
+  if ( script->ss4wLasFF ) { r4_free_ss4w_withsub ( script->ss4wLasFF ); script->ss4wLasFF = NULL; }
+  if ( script->ss4wInkFF ) { r4_free_ss4w_withsub ( script->ss4wInkFF ); script->ss4wInkFF = NULL; }
+}
 
 static BOOL rScript_CaseName ( struct mem_ptr_txt * const p, LPCSTR const sz )
 { return rMemPtrTxt_CmpCaseWordA ( p, sz ) && rMemPtrTxt_Skip_NoValid ( p, strlen ( sz ) ); }
@@ -302,7 +321,7 @@ static BOOL rScript_ParseValName_VectorOfUints ( struct ag47_script * const scri
 static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_ptr_txt * const p )
 {
   return
-  rScript_ParseValName_String ( script, p, &(script->s4wRun), "RUN" ) ||
+  ( rScript_ParseValName_String ( script, p, &(script->s4wRun), "RUN" ) && rScriptRun ( script ) ) ||
   rScript_ParseValName_String ( script, p, &(script->s4wOutPath), "OUT_PATH" ) ||
   rScript_ParseValName_String ( script, p, &(script->s4wPathToWordconv), "PATH_TO_WORDCONV" ) ||
   rScript_ParseValName_String ( script, p, &(script->s4wPathTo7Zip), "PATH_TO_7ZIP" ) ||
@@ -385,7 +404,7 @@ static UINT rScriptRunMem ( BYTE const * const pBuf, UINT const nSize )
   {
     rLog_Error ( L"Code Page\r\n" );
   }
-
+  rScriptFree ( &_script );
   return _script.iErr;
 }
 
