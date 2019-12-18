@@ -27,6 +27,7 @@ LDFLAGS := \
   -lz \
   -llzma \
   -lws2_32 \
+  -lshlwapi \
 
 DEPENDS := \
   src/ag47_misc.c \

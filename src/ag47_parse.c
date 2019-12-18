@@ -89,6 +89,9 @@ BOOL rParse_FolderProc ( LPWSTR const s4wPath, LPCWSTR const wszFolderName ,
   #if 0
   if ( script->ss4wExcludeFF )
   {
+    script->ss4wExcludeFF = r4_malloc_ss4w ( 1 );
+    LPWSTR const s4w = r4_malloc ( r4_get_count_s4w ( script->s4wOutPath ) + 2 );
+    r4_push_array_s4w_sz ( s4w, L"*" );
   }
   else
   {
@@ -101,6 +104,7 @@ BOOL rParse_FolderProc ( LPWSTR const s4wPath, LPCWSTR const wszFolderName ,
   r4_cut_end_s4w ( s4wOrigin, n );
   return iErr;
   #endif
+
   return FALSE;
 }
 

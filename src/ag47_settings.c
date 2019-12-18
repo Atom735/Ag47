@@ -15,7 +15,10 @@ static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
 static BOOL rScriptRun ( struct ag47_script * const script )
 {
   rLog ( L" === === === Выполнение сценария === === === \r\n" );
-  return rFS_Tree ( script->s4wRun, rParse_FileProc, rParse_FolderProc, script  );
+  return rFS_Tree ( script->s4wRun,
+          (BOOL (*)(LPWSTR const,  LPCWSTR const, UINT const, LPVOID const))rParse_FileProc,
+          (BOOL (*)(LPWSTR const,  LPCWSTR const, LPVOID const))rParse_FolderProc,
+          script  );
 }
 
 static VOID rScriptFree ( struct ag47_script * const script )
