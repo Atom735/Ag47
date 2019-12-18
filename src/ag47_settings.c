@@ -187,13 +187,51 @@ static BOOL rScript_ParseVal_String ( struct ag47_script * const script,
   { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
 }
 
+
+static BOOL rScript_ParseVal_Bool ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, BOOL * const pFlag )
+{
+  // rLog ( L" === (%x)%.8hs\r\n", *(p->p), p->p );
+  if ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) && ( *(p->p) == '=' ) &&
+       rMemPtrTxt_Skip_NoValid ( p, 1 ) && rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
+  {
+    // rLog ( L" === (%x)%.8hs\r\n", *(p->p), p->p );
+    if ( rScript_CaseName ( p, "NULL" ) || rScript_CaseName ( p, "0" ) ||
+            rScript_CaseName ( p, "FALSE" ) || rScript_CaseName ( p, "NO" ) ||
+            *(p->p) == ';' ) { *pFlag = FALSE; }
+    else
+    if ( rScript_CaseName ( p, "1" ) || rScript_CaseName ( p, "TRUE" ) ||
+            rScript_CaseName ( p, "YES" ) ) { *pFlag = TRUE; }
+    else
+    { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+    rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+    if ( *(p->p) == ';' ) { return rMemPtrTxt_Skip_NoValid ( p, 1 ); }
+    else
+    { rLogScript ( script, kErr_Script_EndOfValue ); return FALSE; }
+  }
+  else
+  { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
+}
+
 static BOOL rScript_ParseValName_String ( struct ag47_script * const script,
         struct mem_ptr_txt * const p, LPWSTR * const ps4w, LPCSTR const sz )
 {
   if ( rScript_CaseName ( p, sz ) )
   {
     const BOOL b = rScript_ParseVal_String ( script, p, ps4w );
-    if ( b ) { rLog ( L"script {%hs}\t=> \'%s\'\r\n", sz, *ps4w ); }
+    if ( b ) { rLog ( L"script %-16hs %-12hs => \'%s\'\r\n", sz, "STRING", *ps4w ); }
+    return b;
+  }
+  return FALSE;
+}
+
+static BOOL rScript_ParseValName_Bool ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, BOOL * const pFlag, LPCSTR const sz )
+{
+  if ( rScript_CaseName ( p, sz ) )
+  {
+    const BOOL b = rScript_ParseVal_Bool ( script, p, pFlag );
+    if ( b ) { rLog ( L"script %-16hs %-12hs => %hs\r\n", sz, "BOOL", *pFlag ? "TRUE" : "FALSE" ); }
     return b;
   }
   return FALSE;
@@ -203,6 +241,8 @@ static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_pt
 {
   return
   rScript_ParseValName_String ( script, p, &(script->s4wRun), "RUN" ) ||
+  rScript_ParseValName_String ( script, p, &(script->s4wOutPath), "OUT_PATH" ) ||
+  rScript_ParseValName_Bool ( script, p, &(script->bOutRecreate), "OUT_RECREATE" ) ||
   ( rLogScript ( script, kErr_Script_ValueName ), FALSE );
 }
 
