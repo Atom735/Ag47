@@ -47,4 +47,4 @@ all : $(OUT_EXE)
 	$(OUT_EXE)
 
 $(OUT_EXE) : src/main.c $(DEPENDS)
-	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $< $(LDFLAGS) 2> ./build_log.log
+	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $< $(LDFLAGS)
