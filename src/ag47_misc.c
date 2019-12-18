@@ -210,7 +210,20 @@ static UINT rMemPtrTxt_Skip_ToFirstCmpWordA ( struct mem_ptr_txt * const p, LPCS
 static UINT rMemPtrTxt_Skip_ToFirstCmpCaseWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
 { while ( !rMemPtrTxt_CmpCaseWordA ( p, sz ) ) { rMemPtrTxt_Skip ( p, 1 ); } return p->n; }
 
-
+/* Пытается преобразовать строку в число, возвращает количество прочитаных символов */
+static UINT rMemPtrTxt_GetUint ( struct mem_ptr_txt * const p, UINT * const pVal )
+{
+  LPSTR s;
+  UINT const u = strtoul ( p->p, &s, 0 );
+  UINT const d = s - p->p;
+  if ( d )
+  {
+    if ( pVal ) { *pVal = u; }
+    rMemPtrTxt_Skip_NoValid ( p, d );
+    return d;
+  }
+  return 0;
+}
 
 struct file_data_ptr    // указатель на данные файла
 {
