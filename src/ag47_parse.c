@@ -39,7 +39,7 @@ BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
   r4_push_array_s4w_sz ( script->s4wOrigin, wszFileName, 0 );
 
   // Архивы
-  if ( r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wArchiveFF ) )
+  if ( script->ss4wArchiveFF && r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wArchiveFF ) )
   {
     // Пропускаем из за глубины
     if ( script->nRecursive == 0 ) { return TRUE; }
@@ -58,13 +58,13 @@ BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
     return b;
   }
   else // Файлы ГИС
-  if ( r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wLasFF ) )
+  if ( script->ss4wLasFF && r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wLasFF ) )
   {
     r4_cut_end_s4w ( script->s4wOrigin, n );
     return TRUE;
   }
   else // Файлы Инклинометрии
-  if ( r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wInkFF ) )
+  if ( script->ss4wInkFF && r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wInkFF ) )
   {
     r4_cut_end_s4w ( script->s4wOrigin, n );
     return TRUE;

@@ -398,6 +398,22 @@ static VOID * r4_realloc_s4s ( VOID * const p, UINT n )
   return pNew;
 }
 
+static LPWSTR r4_malloc_copy_s4w ( LPWSTR const p, UINT n )
+{
+  struct s4w_head const * const pH = D4GetPtrHead_s4w(p);
+  if ( n <= pH->count ) { n = pH->count * 2; }
+  LPWSTR const pNew = r4_malloc_s4w ( n );
+  r4_get_count_s4w ( pNew ) = pH->count;
+  wmemcpy ( pNew, p, pH->count );
+  return pNew;
+}
+static LPWSTR r4_realloc_s4w ( LPWSTR const p, UINT n )
+{
+  LPWSTR const pNew = r4_malloc_copy_s4w ( p, n );
+  r4_free_s4w ( p );
+  return pNew;
+}
+
 static LPVOID * r4_malloc_copy_s4p ( LPVOID const * const p, UINT n )
 {
   struct s4p_head const * const pH = D4GetPtrHead_s4p(p);

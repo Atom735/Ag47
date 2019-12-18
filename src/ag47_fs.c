@@ -97,11 +97,6 @@ static UINT rFS_ProcRun_Wait ( LPWSTR const cmd )
 static BOOL rFS_Run_7Zip ( struct ag47_script * const script,
         LPCWSTR const wszIn, LPCWSTR const wszOut )
 {
-  if ( !script->s4wPathTo7Zip )
-  {
-    script->s4wPathTo7Zip = r4_malloc_s4w ( kPathMax );
-    rFS_SearchExe_7Zip ( script->s4wPathTo7Zip );
-  }
   LPWSTR const cmd = r4_alloca_s4w ( kPathMax*4 );
   r4_push_array_s4w_sz ( cmd, L"\"", 2 );
   r4_push_path_s4w_s4w ( cmd, script->s4wPathTo7Zip );
@@ -150,11 +145,6 @@ static BOOL rFS_Run_7Zip ( struct ag47_script * const script,
 static UINT rFS_Run_WordConv ( struct ag47_script * const script,
         LPCWSTR const wszIn, LPCWSTR const wszOut )
 {
-  if ( !script->s4wPathToWordconv )
-  {
-    script->s4wPathToWordconv = r4_malloc_s4w ( kPathMax );
-    rFS_SearchExe_Wordconv ( script->s4wPathToWordconv );
-  }
   LPWSTR const cmd = r4_alloca_s4w ( kPathMax*4 );
   r4_push_array_s4w_sz ( cmd, L"\"", 2 );
   r4_push_path_s4w_s4w ( cmd, script->s4wPathToWordconv );

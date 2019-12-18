@@ -51,15 +51,24 @@ static BOOL rScriptRun ( struct ag47_script * const script )
 
   if ( !script->ss4wExcludeFF )
   {
-    script->ss4wExcludeFF = r4_malloc_ss4w ( 1 );
-    LPWSTR const s4w = r4_malloc_s4w ( r4_get_count_s4w ( script->s4wOutPath ) + 2 );
+    LPWSTR const s4w = r4_malloc_s4w ( r4_get_count_s4w ( script->s4wOutPath ) + 4 );
     r4_push_array_s4w_sz ( s4w, L"*", 2 );
     r4_push_array_s4w_s4w ( s4w, script->s4wOutPath );
-    r4_add_array_ss4w ( script->ss4wExcludeFF, &s4w, 1 );
+    script->ss4wExcludeFF = r4_malloc_ss4w ( 1 );
+    // script->ss4wExcludeFF[0] = r4_malloc_s4w ( (r4_get_count_s4w ( script->s4wOutPath ) + 5) );
+    // r4_push_array_s4w_sz ( script->ss4wExcludeFF[0], L"*", 2 );
+    // r4_push_array_s4w_s4w ( script->ss4wExcludeFF[0], script->s4wOutPath );
+    // r4_get_count_ss4w ( script->ss4wExcludeFF ) = 1;
+    // memset ( script->ss4wExcludeFF, 0, sizeof ( LPVOID ) );
+    script->ss4wExcludeFF = r4_add_array_ss4w ( script->ss4wExcludeFF, &s4w, 1 );
   }
 
   --(script->nRecursive);
 
+  script->s4wRun = r4_realloc_s4w ( script->s4wRun, kPathMax );
+
+  // r4_free_s4w ( script->s4wRun ); script->s4wRun = NULL;
+  // return TRUE;
 
   return rFS_Tree ( script->s4wRun,
           (BOOL (*)(LPWSTR const,  LPCWSTR const, UINT const, LPVOID const))rParse_FileProc,
@@ -73,8 +82,8 @@ static VOID rScriptFree ( struct ag47_script * const script )
   if ( script->s4wOutPath ) { r4_free_s4w ( script->s4wOutPath ); script->s4wOutPath = NULL; }
   if ( script->s4wPathToWordconv ) { r4_free_s4w ( script->s4wPathToWordconv ); script->s4wPathToWordconv = NULL; }
   if ( script->s4wPathTo7Zip ) { r4_free_s4w ( script->s4wPathTo7Zip ); script->s4wPathTo7Zip = NULL; }
-  if ( script->ss4wExcludeFF ) { r4_free_ss4w_withsub ( script->ss4wExcludeFF ); script->ss4wExcludeFF = NULL; }
   if ( script->s4uExcludeSizes ) { r4_free_s4u ( script->s4uExcludeSizes ); script->s4uExcludeSizes = NULL; }
+  if ( script->ss4wExcludeFF ) { r4_free_ss4w_withsub ( script->ss4wExcludeFF ); script->ss4wExcludeFF = NULL; }
   if ( script->ss4wArchiveFF ) { r4_free_ss4w_withsub ( script->ss4wArchiveFF ); script->ss4wArchiveFF = NULL; }
   if ( script->ss4wLasFF ) { r4_free_ss4w_withsub ( script->ss4wLasFF ); script->ss4wLasFF = NULL; }
   if ( script->ss4wInkFF ) { r4_free_ss4w_withsub ( script->ss4wInkFF ); script->ss4wInkFF = NULL; }
@@ -99,7 +108,7 @@ static BOOL rScript_ParseVal_String ( struct ag47_script * const script,
       UINT i = 0;
       for ( ; i < p->n; ++i ) { if ( p->p[i] == '\'' ) { break; } }
       UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
-      *ps4w = r4_malloc_s4w ( iW+1 );
+      *ps4w = r4_malloc_s4w ( iW+10 );
       r4_get_count_s4w ( (*ps4w) ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, *ps4w, iW+1 );
       (*ps4w)[iW] = 0;
       rMemPtrTxt_Skip_NoValid ( p, i+1 );
@@ -111,7 +120,7 @@ static BOOL rScript_ParseVal_String ( struct ag47_script * const script,
       UINT i = 0;
       for ( ; i < p->n; ++i ) { if ( p->p[i] == '\"' ) { break; } }
       UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
-      *ps4w = r4_malloc_s4w ( iW+1 );
+      *ps4w = r4_malloc_s4w ( iW+10 );
       r4_get_count_s4w ( (*ps4w) ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, *ps4w, iW+1 );
       (*ps4w)[iW] = 0;
       rMemPtrTxt_Skip_NoValid ( p, i+1 );
@@ -201,7 +210,7 @@ static BOOL rScript_ParseVal_VectorOfStrings ( struct ag47_script * const script
           UINT i = 0;
           for ( ; i < p->n; ++i ) { if ( p->p[i] == '\'' ) { break; } }
           UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
-          LPWSTR s4w = r4_malloc_s4w ( iW+1 );
+          LPWSTR s4w = r4_malloc_s4w ( iW+10 );
           r4_get_count_s4w ( s4w ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, s4w, iW+1 );
           s4w[iW] = 0;
           *pss4w = r4_add_array_ss4w ( *pss4w, &s4w, 1 );
@@ -213,7 +222,7 @@ static BOOL rScript_ParseVal_VectorOfStrings ( struct ag47_script * const script
           UINT i = 0;
           for ( ; i < p->n; ++i ) { if ( p->p[i] == '\"' ) { break; } }
           UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
-          LPWSTR s4w = r4_malloc_s4w ( iW+1 );
+          LPWSTR s4w = r4_malloc_s4w ( iW+10 );
           r4_get_count_s4w ( s4w ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, s4w, iW+1 );
           s4w[iW] = 0;
           *pss4w = r4_add_array_ss4w ( *pss4w, &s4w, 1 );
