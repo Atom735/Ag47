@@ -55,12 +55,30 @@ static BOOL rScriptRun ( struct ag47_script * const script )
     r4_push_array_s4w_sz ( s4w, L"*", 2 );
     r4_push_array_s4w_s4w ( s4w, script->s4wOutPath );
     script->ss4wExcludeFF = r4_malloc_ss4w ( 1 );
-    // script->ss4wExcludeFF[0] = r4_malloc_s4w ( (r4_get_count_s4w ( script->s4wOutPath ) + 5) );
-    // r4_push_array_s4w_sz ( script->ss4wExcludeFF[0], L"*", 2 );
-    // r4_push_array_s4w_s4w ( script->ss4wExcludeFF[0], script->s4wOutPath );
-    // r4_get_count_ss4w ( script->ss4wExcludeFF ) = 1;
-    // memset ( script->ss4wExcludeFF, 0, sizeof ( LPVOID ) );
     script->ss4wExcludeFF = r4_add_array_ss4w ( script->ss4wExcludeFF, &s4w, 1 );
+  }
+
+  if ( !script->ss4wLasFF )
+  {
+    LPWSTR s4w;
+    script->ss4wLasFF = r4_malloc_ss4w ( 2 );
+    s4w = r4_malloc_init_s4w ( L"*.las" );
+    script->ss4wLasFF = r4_add_array_ss4w ( script->ss4wLasFF, &s4w, 1 );
+    s4w = r4_malloc_init_s4w ( L"*.las[?]" );
+    script->ss4wLasFF = r4_add_array_ss4w ( script->ss4wLasFF, &s4w, 1 );
+  }
+  if ( !script->ss4wInkFF )
+  {
+    LPWSTR s4w;
+    script->ss4wInkFF = r4_malloc_ss4w ( 4 );
+    s4w = r4_malloc_init_s4w ( L"*.txt" );
+    script->ss4wInkFF = r4_add_array_ss4w ( script->ss4wInkFF, &s4w, 1 );
+    s4w = r4_malloc_init_s4w ( L"*.doc" );
+    script->ss4wInkFF = r4_add_array_ss4w ( script->ss4wInkFF, &s4w, 1 );
+    s4w = r4_malloc_init_s4w ( L"*.docx" );
+    script->ss4wInkFF = r4_add_array_ss4w ( script->ss4wInkFF, &s4w, 1 );
+    s4w = r4_malloc_init_s4w ( L"*.dbf" );
+    script->ss4wInkFF = r4_add_array_ss4w ( script->ss4wInkFF, &s4w, 1 );
   }
 
   --(script->nRecursive);
