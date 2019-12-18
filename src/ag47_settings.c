@@ -144,8 +144,9 @@ LPCWSTR const g7ErrStrScript[] =
 static UINT rLogScript_ ( LPCSTR const szFile, UINT const nLine,
         struct ag47_script * const script, UINT const iErr )
 {
-  return rLog_Error_ ( szFile,  nLine, L"script on line (%u): %16.*hs\r\n  error 0x%x => %s\r\n",
+  return rLog_Error_ ( szFile,  nLine, L"script on line (%u): %-*.*hs\r\n  error 0x%x => %s\r\n",
           script->p_txt->nLine, script->p_txt->n < 16 ? script->p_txt->n : 16,
+          script->p_txt->n < 16 ? script->p_txt->n : 16,
           script->p_txt->p, iErr, g7ErrStrScript[iErr] );
 }
 #define rLogScript(_s_,_i_) rLogScript_(__FILE__,__LINE__,_s_,_i_)
@@ -201,7 +202,7 @@ static BOOL rScript_ParseValName_String ( struct ag47_script * const script,
 static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_ptr_txt * const p )
 {
   return
-  rScript_ParseValName_String ( script, p, &(script->s4wRun), "RUN" ) &&
+  rScript_ParseValName_String ( script, p, &(script->s4wRun), "RUN" ) ||
   ( rLogScript ( script, kErr_Script_ValueName ), FALSE );
 }
 
