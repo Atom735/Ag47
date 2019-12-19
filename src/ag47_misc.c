@@ -46,6 +46,17 @@ static UINT rGetBuf_NL ( BYTE const * pBuf, UINT nSize )
   return (iCRLF>iCR) ? ( (iCRLF>iLF) ? kNewLine_CRLF : kNewLine_LF ) : ( (iCR>iLF) ? kNewLine_CR : kNewLine_LF );
 }
 
+static LPCSTR rGetNlName ( UINT const i )
+{
+  switch ( i )
+  {
+    case kNewLine_CRLF: return "CRLF";
+    case kNewLine_LF: return "LF";
+    case kNewLine_CR: return "CR";
+    default: return "???";
+  }
+}
+
 /* Сравнивает память и слово, возвращает длину слова при совпадении */
 static UINT rStrCmpArrayAA ( const LPCSTR p, const UINT n, const LPCSTR p2 )
 {

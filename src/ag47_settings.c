@@ -51,6 +51,21 @@ static BOOL rScriptRun ( struct ag47_script * const script )
   r4_init_s4w_s4w ( script->s4wPathOutErrorDir, script->s4wOutPath );
   rFS_AddDir ( script->s4wPathOutErrorDir, L"\\err", 0 );
 
+  {
+    const UINT n = r4_get_count_s4w ( script->s4wPathOutLogsDir );
+    r4_push_array_s4w_sz ( script->s4wPathOutLogsDir, L"\\LAS_DB.txt", 0 );
+    WIN32_FIND_DATA ffd;
+    HANDLE const hFind = FindFirstFile ( script->s4wPathOutLogsDir, &ffd );
+    script->pFLasDB = _wfopen ( script->s4wPathOutLogsDir, L"ab" );
+    if ( hFind != INVALID_HANDLE_VALUE ) { FindClose ( hFind ); }
+    else
+    {
+      fwprintf ( script->pFLasDB, L"%c", 0xFEFF );
+      fwprintf ( script->pFLasDB, L"SECTION\tMNEM\tUNITS\tDATA\tDESC\tFILE_PATH\tLINE\r\n" );
+    }
+    r4_cut_end_s4w ( script->s4wPathOutLogsDir, n );
+  }
+
 
   if ( !script->ss4wExcludeFF )
   {
@@ -99,6 +114,7 @@ static BOOL rScriptRun ( struct ag47_script * const script )
 
 static VOID rScriptFree ( struct ag47_script * const script )
 {
+  if ( script->pFLasDB ) { fclose ( script->pFLasDB ); script->pFLasDB = NULL; }
   if ( script->s4wRun ) { r4_free_s4w ( script->s4wRun ); script->s4wRun = NULL; }
   if ( script->s4wOutPath ) { r4_free_s4w ( script->s4wOutPath ); script->s4wOutPath = NULL; }
   if ( script->s4wPathToWordconv ) { r4_free_s4w ( script->s4wPathToWordconv ); script->s4wPathToWordconv = NULL; }

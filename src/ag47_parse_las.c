@@ -5,13 +5,14 @@
   [^] NEWLINE     -             [iCP]        -              [ORIGIN] [LINE]
   [^] CODEPAGE_x  -             [iCP[0]]     -              [ORIGIN] [LINE]
   [~] [SECTION]   -             [F_LINE]     -              [ORIGIN] [LINE]
-  [#] -           -             [F_LINE]     -              [ORIGIN] [LINE]
-  [*] -           -             [F_LINE]     -              [ORIGIN] [LINE]
+  [#] -           -             [F_LINE]     -              [ORIGIN] [LINE] // Коментарий
+  [*] -           -             [F_LINE]     -              [ORIGIN] [LINE] // Строка
   [V] [MNEM]      [UNITS]       [DATA]      [DESC]          [ORIGIN] [LINE]
   [W] [MNEM]      [UNITS]       [DATA]      [DESC]          [ORIGIN] [LINE]
   [C] [MNEM]      [UNITS]       [DATA]      [DESC]          [ORIGIN] [LINE]
   [P] [MNEM]      [UNITS]       [DATA]      [DESC]          [ORIGIN] [LINE]
   [O] -           -             [F_LINE]     -              [ORIGIN] [LINE]
+  L"SECTION\tMNEM\tUNITS\tDATA\tDESC\tFILE_PATH\tLINE\r\n"
 */
 
 struct las_line_data
@@ -33,6 +34,7 @@ struct file_state_las
   struct file_map       fm;
   struct ag47_script  * script;
   LPCWSTR               wszFileName;    // Название файла
+  LPWSTR                s4wTempOut;     // Путь к временному файлу
   UINT                  iCP[2];         // Кодировка
   UINT                  iErr;           // Номер ошибки
   BYTE                  iSection;       // В какой секции сейчас находимся
@@ -43,13 +45,13 @@ struct file_state_las
   UINT                  iVersion;       // Версия LAS файла
   BOOL                  bWrap;          // Перенос данных
 
+#if 0
   LPCWSTR               s4wOrigin;      // Путь к оригиналу файла
   UINT                  iCodePage;      // Номер кодировки
   UINT                  iLineFeed;      // Символ перехода на новую строку
   UINT                  nWarnings;      // Количество предупреждений
   double                fErr;           // Поправка на совпадение
   struct las_line_data *pArray;         // Все линии файла
-#if 0
   struct file_data_ptr  t,              // Обработка файла
           aMNEM, aUNIT, aDATA, aDESC, aLine; // Переменные обработки линии
   struct {
@@ -66,6 +68,16 @@ struct file_state_las
   struct las_c_data    *pA_C;           // Все линии секции C
 #endif
 };
+
+static VOID rLas_LogToDB ( struct file_state_las * const las, LPCWSTR const fmt, ... )
+{
+  va_list args;
+  va_start ( args, fmt );
+  vfwprintf ( las->script->pFLasDB, fmt, args );
+  va_end ( args );
+}
+
+
 
 #if 0
 
@@ -500,21 +512,57 @@ static UINT rParse_Las_S_V ( struct file_state_las * const pL )
 static BOOL rLas_ParseSection_Version ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
   rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  las->aLine.n -= p->n;
+  rMemPtrTxt_TrimSpaces ( &(las->aLine) );
+  rLas_LogToDB ( las, L"*\t\t\t%.*hs\t\t%s\t%u\r\n",  las->aLine.n,  las->aLine.p, las->script->s4wOrigin, las->aLine.nLine );
+  rLas_LogToDB ( las, L"V\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
+          las->aMNEM.n,  las->aMNEM.p,
+          las->aUNIT.n,  las->aUNIT.p,
+          0,  las->aDATA.p,
+          0,  las->aDESC.p,
+          las->script->s4wOrigin, las->aLine.nLine );
   return TRUE;
 }
 static BOOL rLas_ParseSection_Well ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
   rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  las->aLine.n -= p->n;
+  rMemPtrTxt_TrimSpaces ( &(las->aLine) );
+  rLas_LogToDB ( las, L"*\t\t\t%.*hs\t\t%s\t%u\r\n",  las->aLine.n,  las->aLine.p, las->script->s4wOrigin, las->aLine.nLine );
+  rLas_LogToDB ( las, L"W\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
+          las->aMNEM.n,  las->aMNEM.p,
+          las->aUNIT.n,  las->aUNIT.p,
+          0,  las->aDATA.p,
+          0,  las->aDESC.p,
+          las->script->s4wOrigin, las->aLine.nLine );
   return TRUE;
 }
 static BOOL rLas_ParseSection_Curve ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
   rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  las->aLine.n -= p->n;
+  rMemPtrTxt_TrimSpaces ( &(las->aLine) );
+  rLas_LogToDB ( las, L"*\t\t\t%.*hs\t\t%s\t%u\r\n",  las->aLine.n,  las->aLine.p, las->script->s4wOrigin, las->aLine.nLine );
+  rLas_LogToDB ( las, L"C\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
+          las->aMNEM.n,  las->aMNEM.p,
+          las->aUNIT.n,  las->aUNIT.p,
+          0,  las->aDATA.p,
+          0,  las->aDESC.p,
+          las->script->s4wOrigin, las->aLine.nLine );
   return TRUE;
 }
 static BOOL rLas_ParseSection_Param ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
   rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  las->aLine.n -= p->n;
+  rMemPtrTxt_TrimSpaces ( &(las->aLine) );
+  rLas_LogToDB ( las, L"*\t\t\t%.*hs\t\t%s\t%u\r\n",  las->aLine.n,  las->aLine.p, las->script->s4wOrigin, las->aLine.nLine );
+  rLas_LogToDB ( las, L"P\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
+          las->aMNEM.n,  las->aMNEM.p,
+          las->aUNIT.n,  las->aUNIT.p,
+          0,  las->aDATA.p,
+          0,  las->aDESC.p,
+          las->script->s4wOrigin, las->aLine.nLine );
   return TRUE;
 }
 
@@ -556,7 +604,11 @@ static BOOL rLas_ParseLine_UNIT ( struct file_state_las * const las, struct mem_
 
 static BOOL rLas_ParseSection_Other ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
+  struct mem_ptr_txt q = *p;
   rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  q.n -= p->n;
+  rMemPtrTxt_TrimSpaces ( &q );
+  rLas_LogToDB ( las, L"O\t\t\t%.*hs\t\t%s\t%u\r\n", q.n, q.p, las->script->s4wOrigin, q.nLine );
   return TRUE;
 }
 
@@ -589,19 +641,26 @@ static BOOL rLas_ParseLine_MNEM ( struct file_state_las * const las, struct mem_
 
 static BOOL rLas_ParseSection_Ascii ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
-  rMemPtrTxt_Skip_ToBeginNewLine ( p );
   return FALSE;
 }
 
 static BOOL rLas_SkipLineComment ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
+  struct mem_ptr_txt q = *p;
   rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  q.n -= p->n;
+  rMemPtrTxt_TrimSpaces ( &q );
+  rLas_LogToDB ( las, L"#\t\t\t%.*hs\t\t%s\t%u\r\n", q.n, q.p, las->script->s4wOrigin, q.nLine );
   return TRUE;
 }
 
 static BOOL rLas_SkipLineSecton ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
+  struct mem_ptr_txt q = *p;
   rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  q.n -= p->n;
+  rMemPtrTxt_TrimSpaces ( &q );
+  rLas_LogToDB ( las, L"~\t%c\t\t%.*hs\t\t%s\t%u\r\n", las->iSection, q.n, q.p, las->script->s4wOrigin, q.nLine );
   return TRUE;
 }
 
@@ -616,7 +675,7 @@ static BOOL rLas_ParseLine_Head ( struct file_state_las * const las, struct mem_
       {
         case 'V': case 'W': case 'C': case 'P': case 'O':
           las->iSection = p->p[1]; return rLas_SkipLineSecton ( las, p );
-        case 'A': return rLas_SkipLineSecton ( las, p ) && rLas_ParseSection_Ascii ( las, p );
+        case 'A': las->iSection = p->p[1]; return rLas_SkipLineSecton ( las, p ) && rLas_ParseSection_Ascii ( las, p );
         default:
           rLog_Error ( L" => Line %u: Неизвестное название секции\r\n", p->nLine );
           return FALSE;
@@ -648,7 +707,7 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
   if ( !rFS_FileMapOpen ( &(_las.fm), s4wPath ) ) { return FALSE; }
   UINT a1[g7CharMapCount], a2[g7CharMapCount];
   _las.iCP[1] = rGetBufCodePage ( _las.fm.pData, _las.fm.nSize, a1, a2 );
-  _las.iCP[0] = rGetCodePageNumById ( _las.iCP[1] );
+  _las.iCP[0] = g7CharMapId[_las.iCP[1]];
   setlocale ( LC_ALL, g7CharMapCP[_las.iCP[1]] );
   // _las.iNL    = rGetBuf_NL ( _las.fm.pData, _las.fm.nSize );
   _las.s      = ((struct mem_ptr_txt){
@@ -656,6 +715,15 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
           .n = _las.fm.nSize,
           .nLine = 1,
           .iNL = rGetBuf_NL ( _las.fm.pData, _las.fm.nSize ) });
+
+
+  rLas_LogToDB ( &_las, L"^\tCODEPAGE\t%u\t%hs\t\t%s\t\r\n", _las.iCP[0], g7CharMapNames[_las.iCP[1]], script->s4wOrigin );
+  rLas_LogToDB ( &_las, L"^\tNEWLINE\t\t%hs\t\t%s\t\r\n", rGetNlName(_las.s.iNL), script->s4wOrigin );
+  for ( UINT i = 0; i < g7CharMapCount; ++i )
+  {
+    rLas_LogToDB ( &_las, L"^\tCP.%u\t%hs\t%u\t%u\t%s\t\r\n", g7CharMapId[i], g7CharMapNames[i], a1[i], a2[i], script->s4wOrigin );
+  }
+
 #if 0
   _las.iLineFeed           = rGetBufEndOfLine ( _las.fm.pData, _las.fm.nSize );
   _las.t.p                 = _las.fm.pData;
@@ -669,7 +737,11 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
 #endif
   setlocale ( LC_ALL, g7CharMapCP[_las.iCP[1]] );
 
+  _las.s4wTempOut = r4_alloca_s4w ( kPathMax );
+  r4_init_s4w_s4w ( _las.s4wTempOut, script->s4wPathOutTempDir );
+  rFS_NewRandDir_s4w ( _las.s4wTempOut ); // .temp/xxxxxxxx/
   while ( rLas_ParseLine_Head ( &_las, &(_las.s) ) ) { }
+  rFS_DeleteTree ( _las.s4wTempOut );
 
 #if 0
   static UINT nFile = 0;

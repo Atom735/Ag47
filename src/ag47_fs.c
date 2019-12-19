@@ -11,7 +11,6 @@ static BOOL rFS_SearchExe_7Zip ( LPWSTR const s4w )
   {
     rLog_Error_WinAPI ( FindFirstFile, GetLastError(), L"%s\r\n", s4w );
     rLog_Error ( L"Невозможно найти [7z.exe], возможно не установлен [7zip]\r\n" );
-    FindClose ( hFind );
     r4_cut_end_s4w ( s4w, 0 );
     return FALSE;
   }
@@ -32,7 +31,6 @@ static BOOL rFS_SearchExe_Wordconv ( LPWSTR const s4w )
   {
     rLog_Error_WinAPI ( FindFirstFile, GetLastError(), L"%s\r\n", wsz );
     rLog_Error ( L"Невозможно найти папку с установленным [MS Office]\r\n" );
-    FindClose ( hFind );
     return FALSE;
   }
   do
@@ -45,7 +43,6 @@ static BOOL rFS_SearchExe_Wordconv ( LPWSTR const s4w )
     HANDLE const _hFind = FindFirstFile ( s4w, &_ffd );
     if ( _hFind != INVALID_HANDLE_VALUE )
     {
-      FindClose ( _hFind );
       FindClose ( hFind );
       return TRUE;
     }
