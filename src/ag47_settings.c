@@ -111,6 +111,54 @@ static VOID rScriptFree ( struct ag47_script * const script )
 static BOOL rScript_CaseName ( struct mem_ptr_txt * const p, LPCSTR const sz )
 { return rMemPtrTxt_CmpCaseWordA ( p, sz ) && rMemPtrTxt_Skip_NoValid ( p, strlen ( sz ) ); }
 
+static BOOL rScript_ParseVal_CP ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, UINT * const piCP )
+{
+  if ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) && ( *(p->p) == '=' ) &&
+       rMemPtrTxt_Skip_NoValid ( p, 1 ) && rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
+  {
+    if ( rScript_CaseName ( p, "NULL" ) || *(p->p) == ';' ) { *piCP = 0; }
+    else
+    if ( ( *piCP = rGetCodePageIdByAsciiName ( p->p ) ) )
+    {
+      // Небезопасно!
+      while ( rMemPtrTxt_Skip_1ByteIfNotArray ( p, ";\r\n\t", 4 ) );
+    }
+    else
+    { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+    rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+    if ( *(p->p) == ';' ) { return rMemPtrTxt_Skip_NoValid ( p, 1 ); }
+    else
+    { rLogScript ( script, kErr_Script_EndOfValue ); return FALSE; }
+  }
+  else
+  { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
+}
+
+static BOOL rScript_ParseVal_NL ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, UINT * const piNL )
+{
+  if ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) && ( *(p->p) == '=' ) &&
+       rMemPtrTxt_Skip_NoValid ( p, 1 ) && rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
+  {
+    if ( rScript_CaseName ( p, "NULL" ) || *(p->p) == ';' ) { *piNL = kNewLine_Null; }
+    else
+    if ( rScript_CaseName ( p, "CRLF" ) ) { *piNL = kNewLine_CRLF; }
+    else
+    if ( rScript_CaseName ( p, "LF" ) ) { *piNL = kNewLine_LF; }
+    else
+    if ( rScript_CaseName ( p, "CR" ) ) { *piNL = kNewLine_CR; }
+    else
+    { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+    rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+    if ( *(p->p) == ';' ) { return rMemPtrTxt_Skip_NoValid ( p, 1 ); }
+    else
+    { rLogScript ( script, kErr_Script_EndOfValue ); return FALSE; }
+  }
+  else
+  { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
+}
+
 static BOOL rScript_ParseVal_String ( struct ag47_script * const script,
         struct mem_ptr_txt * const p, LPWSTR * const ps4w )
 {
@@ -317,6 +365,35 @@ static BOOL rScript_ParseVal_VectorOfUints ( struct ag47_script * const script,
   { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
 }
 
+static BOOL rScript_ParseValName_CP ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, UINT * const piCP, LPCSTR const sz )
+{
+  if ( rScript_CaseName ( p, sz ) )
+  {
+    const BOOL b = rScript_ParseVal_CP ( script, p, piCP );
+    if ( b ) { rLog ( L"script %-16hs %-12hs => %u %hs\r\n", sz, "CODEPAGE",
+            *piCP, rGetCodePageNameById ( *piCP ) ); }
+    return b;
+  }
+  return FALSE;
+}
+
+static BOOL rScript_ParseValName_NL ( struct ag47_script * const script,
+        struct mem_ptr_txt * const p, UINT * const piNL, LPCSTR const sz )
+{
+  if ( rScript_CaseName ( p, sz ) )
+  {
+    const BOOL b = rScript_ParseVal_NL ( script, p, piNL );
+    if ( b ) { rLog ( L"script %-16hs %-12hs => %hs\r\n", sz, "NEWLINE",
+            *piNL == kNewLine_Null ? "NULL" :
+            *piNL == kNewLine_CRLF ? "CRLF" :
+            *piNL == kNewLine_LF ? "LF" :
+            *piNL == kNewLine_CR ? "CR" : "???" ); }
+    return b;
+  }
+  return FALSE;
+}
+
 static BOOL rScript_ParseValName_String ( struct ag47_script * const script,
         struct mem_ptr_txt * const p, LPWSTR * const ps4w, LPCSTR const sz )
 {
@@ -411,6 +488,10 @@ static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_pt
   rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wLasFF), "LAS_FF" ) ||
   rScript_ParseValName_VectorOfStrings ( script, p, &(script->ss4wInkFF), "INK_FF" ) ||
   rScript_ParseValName_VectorOfUints ( script, p, &(script->s4uExcludeSizes), "EXCLUDE_SIZE" ) ||
+  rScript_ParseValName_NL ( script, p, &(script->iLasNL), "LAS_NL" ) ||
+  rScript_ParseValName_NL ( script, p, &(script->iInkNL), "INK_NL" ) ||
+  rScript_ParseValName_CP ( script, p, &(script->iLasCP), "LAS_CP" ) ||
+  rScript_ParseValName_CP ( script, p, &(script->iInkCP), "INK_CP" ) ||
   ( rLogScript ( script, kErr_Script_ValueName ), FALSE );
 }
 
