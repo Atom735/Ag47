@@ -41,7 +41,7 @@ INT APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpC
   AllocConsole ( );
   const UINT iErr = rScriptRunFile ( L".ag47-script" );
   rLog ( NULL );
-  rParse_Las_Log ( NULL );
+  // rParse_Las_Log ( NULL );
   _free_locale ( g_locale_C );
   rLocalsFree ( );
   return iErr;

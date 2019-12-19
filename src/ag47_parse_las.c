@@ -34,7 +34,10 @@ struct file_state_las
   struct ag47_script  * script;
   LPCWSTR               wszFileName;    // Название файла
   UINT                  iCP[2];         // Кодировка
-  UINT                  iNL;            // Символ перехода на новую строку
+  UINT                  iErr;           // Номер ошибки
+  BYTE                  iSection;       // В какой секции сейчас находимся
+  struct mem_ptr_txt    s,              // Указатель обработки файла
+      aMNEM, aUNIT, aDATA, aDESC, aLine;// Переменные обработки линии
 
 
   UINT                  iVersion;       // Версия LAS файла
@@ -43,11 +46,10 @@ struct file_state_las
   LPCWSTR               s4wOrigin;      // Путь к оригиналу файла
   UINT                  iCodePage;      // Номер кодировки
   UINT                  iLineFeed;      // Символ перехода на новую строку
-  BYTE                  iSection;       // В какой секции сейчас находимся
   UINT                  nWarnings;      // Количество предупреждений
   double                fErr;           // Поправка на совпадение
   struct las_line_data *pArray;         // Все линии файла
-
+#if 0
   struct file_data_ptr  t,              // Обработка файла
           aMNEM, aUNIT, aDATA, aDESC, aLine; // Переменные обработки линии
   struct {
@@ -62,10 +64,10 @@ struct file_state_las
           w_STRT, w_STOP, w_STEP, w_NULL,
           w_WELL;
   struct las_c_data    *pA_C;           // Все линии секции C
-
+#endif
 };
 
-
+#if 0
 
 static UINT rParse_Las_Log_v ( const LPCWSTR fmt, va_list args )
 {
@@ -492,126 +494,147 @@ static UINT rParse_Las_S_V ( struct file_state_las * const pL )
           .aMNEM = *aMNEM, .aUNIT = *aUNIT, .aDATA = *aDATA, .aDESC = *aDESC, .aLine = *aLine }), 1 );
   return 0;
 }
+#endif
 
-static UINT rParse_Las_S_DATA ( struct file_state_las * const pL )
+
+static BOOL rLas_ParseSection_Version ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
-  switch ( pL->iSection )
-  {
-    case 'V': { const UINT iErr = rParse_Las_S_V ( pL ); if ( iErr ) { return iErr; } } goto P_End;
-    case 'W': { const UINT iErr = rParse_Las_S_W ( pL ); if ( iErr ) { return iErr; } } goto P_End;
-    case 'C': { const UINT iErr = rParse_Las_S_C ( pL ); if ( iErr ) { return iErr; } } goto P_End;
-    case 'P': { const UINT iErr = rParse_Las_S_P ( pL ); if ( iErr ) { return iErr; } } goto P_End;
-    case 'O': { const UINT iErr = rParse_Las_S_O ( pL ); if ( iErr ) { return iErr; } } goto P_End;
-    default:
-      rLog_Error ( L" => LAS(%u): Неопределённая секция\n", pL->t.nLine );
-      return __LINE__;
-  }
-  P_End:
-
-  rParse_Las_Log ( L"%hc\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
-          pL->iSection,
-          pL->aMNEM.n, pL->aMNEM.p,
-          pL->aUNIT.n, pL->aUNIT.p,
-          pL->aDATA.n, pL->aDATA.p,
-          pL->aDESC.n, pL->aDESC.p,
-          pL->s4wOrigin, pL->aMNEM.nLine );
-  return 0;
+  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  return TRUE;
+}
+static BOOL rLas_ParseSection_Well ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  return TRUE;
+}
+static BOOL rLas_ParseSection_Curve ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  return TRUE;
+}
+static BOOL rLas_ParseSection_Param ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  return TRUE;
 }
 
-static UINT rParse_Las_S_UNIT ( struct file_state_las * const pL )
+static BOOL rLas_ParseLine_DATA ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
-  pL->aUNIT = pL->t;
-  struct file_data_ptr * const p = &(pL->t);
-  while ( p->n )
+  switch ( las->iSection )
   {
-    if ( *(p->p) == pL->iLineFeed || ( pL->iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' ) )
+    case 'V': return rLas_ParseSection_Version ( las, p );
+    case 'W': return rLas_ParseSection_Well ( las, p );
+    case 'C': return rLas_ParseSection_Curve ( las, p );
+    case 'P': return rLas_ParseSection_Param ( las, p );
+    default:
+      rLog_Error ( L" => Line %u: Неопределённая секция\r\n", p->nLine );
+      return FALSE;
+  }
+}
+
+static BOOL rLas_ParseLine_UNIT ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  las->aUNIT = *p;
+  do {
+    if ( rMemPtrTxt_IsNewLine ( p ) )
     {
-      rLog_Error ( L" => LAS(%u): Непредвиденный конец строки (отсутсвует пробел после точки)\n", p->nLine );
-      return __LINE__;
+      rLog_Error ( L" => Line %u: Непредвиденный конец строки (отсутсвует пробел после точки)\r\n", p->nLine );
+      return rMemPtrTxt_Skip_ToBeginNewLine ( p );
     }
     else
-    if ( *(p->p) == ' ' || *(p->p) == '\t' )
+    if ( rMemPtrTxt_Skip_1ByteIfSpace ( p ) )
     {
-      pL->aUNIT.n -= p->n;
-      rFileData_Skip(p,1);
-      rFileData_Trim ( &(pL->aUNIT) );
-      return rParse_Las_S_DATA ( pL );
+      las->aUNIT.n -= p->n+1;
+      rMemPtrTxt_TrimSpaces ( &(las->aUNIT) );
+      return rLas_ParseLine_DATA ( las, p );
     }
-    else { rFileData_Skip(p,1); }
-  }
-  rLog_Error ( L" => LAS(%u): Непредвиденный конец файла (отсутсвует пробел после точки)\n", p->nLine );
-  return __LINE__;
+  } while ( rMemPtrTxt_Skip_NoValid ( p, 1 ) );
+  rLog_Error ( L" => Line %u: Непредвиденный конец файла (отсутсвует пробел после точки)\r\n", p->nLine );
+  return FALSE;
 }
 
-static UINT rParse_Las_S_MNEM ( struct file_state_las * const pL )
+
+static BOOL rLas_ParseSection_Other ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
-  pL->aLine = pL->t;
-  pL->aMNEM = pL->t;
-  struct file_data_ptr * const p = &(pL->t);
+  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  return TRUE;
+}
+
+
+static BOOL rLas_ParseLine_MNEM ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  las->aLine = *p;
+  if ( las->iSection == 'O' ) { return rLas_ParseSection_Other ( las, p ); }
+  las->aMNEM = *p;
+  // struct file_data_ptr * const p = &(pL->t);
   // Идём до точки
-  while ( p->n )
-  {
-    if ( *(p->p) == pL->iLineFeed || ( pL->iLineFeed == 0x0D0A && p->n >= 2 && p->p[0] == '\r' && p->p[1] == '\n' ) )
+  do {
+    if ( rMemPtrTxt_IsNewLine ( p ) )
     {
-      rLog_Error ( L" => LAS(%u): Непредвиденный конец строки (отсутсвует точка)\n", p->nLine );
-      return __LINE__;
+      rLog_Error ( L" => Line %u: Непредвиденный конец строки (отсутсвует точка)\r\n", p->nLine );
+      return rMemPtrTxt_Skip_ToBeginNewLine ( p );
     }
     else
     if ( *(p->p) == '.' )
     {
-      pL->aMNEM.n -= p->n;
-      rFileData_Skip(p,1);
-      rFileData_Trim ( &(pL->aMNEM) );
-      return rParse_Las_S_UNIT ( pL );
+      las->aMNEM.n -= p->n;
+      rMemPtrTxt_Skip_NoValid ( p, 1 );
+      rMemPtrTxt_TrimSpaces ( &(las->aMNEM) );
+      return rLas_ParseLine_UNIT ( las, p );
     }
-    else { rFileData_Skip(p,1); }
-  }
-  rLog_Error ( L" => LAS(%u): Непредвиденный конец файла (отсутсвует точка)\n", p->nLine );
-  return __LINE__;
+  } while ( rMemPtrTxt_Skip_NoValid ( p, 1 ) );
+  rLog_Error ( L" => Line %u: Непредвиденный конец файла (отсутсвует точка)\r\n", p->nLine );
+  return FALSE;
 }
 
-
-static UINT rParse_Las_BeginOfLine ( struct file_state_las * const pL )
+static BOOL rLas_ParseSection_Ascii ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
-  struct file_data_ptr * const p = &(pL->t);
-  P_Begin:
-  rFileData_SkipWhiteSpaces ( &(pL->t), pL->iLineFeed );
-
-  if ( p->n <= 1 )
-  {
-    rLog_Error ( L" => LAS(%u): Непредвиденный конец файла\n", p->nLine );
-    return __LINE__;
-  }
-
-  if ( *(p->p) == '~' )
-  {
-    switch ( p->p[1] )
-    {
-      case 'V': case 'W': case 'C': case 'P': case 'O':
-        pL->iSection = p->p[1];
-        rFileData_SkipToNewLine ( p, pL->iLineFeed );
-        goto P_Begin;
-      case 'A': return rParse_Las_SectionA ( pL );
-      default:
-        rLog_Error ( L" => LAS(%u): Неизвестное название секции\n", p->nLine );
-        return __LINE__;
-    }
-  }
-  else
-  if ( *(p->p) == '#' )
-  {
-    rFileData_SkipToNewLine ( p, pL->iLineFeed );
-    goto P_Begin;
-  }
-  else
-  {
-    const UINT iErr = rParse_Las_S_MNEM ( pL );
-    if ( iErr ) return iErr;
-    goto P_Begin;
-  }
+  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  return FALSE;
 }
 
+static BOOL rLas_SkipLineComment ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  return TRUE;
+}
 
+static BOOL rLas_SkipLineSecton ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  return TRUE;
+}
+
+static BOOL rLas_ParseLine_Head ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  if ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) >= 2 )
+  {
+
+    if ( *(p->p) == '~' )
+    {
+      switch ( p->p[1] )
+      {
+        case 'V': case 'W': case 'C': case 'P': case 'O':
+          las->iSection = p->p[1]; return rLas_SkipLineSecton ( las, p );
+        case 'A': return rLas_SkipLineSecton ( las, p ) && rLas_ParseSection_Ascii ( las, p );
+        default:
+          rLog_Error ( L" => Line %u: Неизвестное название секции\r\n", p->nLine );
+          return FALSE;
+      }
+    }
+    else
+    if ( *(p->p) == '#' )
+    {
+      return rLas_SkipLineComment ( las, p );
+    }
+    else
+    {
+      return rLas_ParseLine_MNEM ( las, p );
+    }
+  }
+  rLog_Error ( L" => Line %u: Непредвиденный конец файла\r\n", p->nLine );
+  return FALSE;
+}
 
 
 static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4wPath, LPCWSTR const wszFileName )
@@ -626,8 +649,14 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
   UINT a1[g7CharMapCount], a2[g7CharMapCount];
   _las.iCP[1] = rGetBufCodePage ( _las.fm.pData, _las.fm.nSize, a1, a2 );
   _las.iCP[0] = rGetCodePageNumById ( _las.iCP[1] );
-  _las.iNL    = rGetBuf_NL ( _las.fm.pData, _las.fm.nSize );
-
+  setlocale ( LC_ALL, g7CharMapCP[_las.iCP[1]] );
+  // _las.iNL    = rGetBuf_NL ( _las.fm.pData, _las.fm.nSize );
+  _las.s      = ((struct mem_ptr_txt){
+          .p = (LPCSTR)_las.fm.pData,
+          .n = _las.fm.nSize,
+          .nLine = 1,
+          .iNL = rGetBuf_NL ( _las.fm.pData, _las.fm.nSize ) });
+#if 0
   _las.iLineFeed           = rGetBufEndOfLine ( _las.fm.pData, _las.fm.nSize );
   _las.t.p                 = _las.fm.pData;
   _las.t.n                 = _las.fm.nSize;
@@ -637,7 +666,11 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
   _las.fErr                = 0.015;
   _las.pArray              = (struct las_line_data *) r4_malloc_s4s ( 64, sizeof(struct las_line_data) );
   _las.pA_C                = (struct las_c_data *) r4_malloc_s4s ( 2, sizeof(struct las_c_data) );
+#endif
   setlocale ( LC_ALL, g7CharMapCP[_las.iCP[1]] );
+
+  while ( rLas_ParseLine_Head ( &_las, &(_las.s) ) ) { }
+
 #if 0
   static UINT nFile = 0;
   CHAR str[512];
@@ -700,9 +733,9 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
 
 
   // P_End:
-  r4_free_s4s ( _las.pA_C );
-  r4_free_s4s ( _las.pArray );
+  // r4_free_s4s ( _las.pA_C );
+  // r4_free_s4s ( _las.pArray );
   rFS_FileMapClose ( &_las.fm );
-  return TRUE;
+  return _las.iErr == 0;
 }
 

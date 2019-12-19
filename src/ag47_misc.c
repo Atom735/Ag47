@@ -96,10 +96,10 @@ static BOOL rMemPtrBin_Skip_1ByteIfNotArray ( struct mem_ptr_bin * const p, BYTE
 
 /* Смещает указатель на один байт если isspace() */
 static BOOL rMemPtrBin_Skip_1ByteIfSpace ( struct mem_ptr_bin * const p )
-{ return ( p->n && isspace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
+{ return ( p->n && rStrIsSpace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
 /* Смещает указатель на один байт если не isspace() */
 static BOOL rMemPtrBin_Skip_1ByteIfNotSpace ( struct mem_ptr_bin * const p )
-{ return ( p->n && !isspace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
+{ return ( p->n && !rStrIsSpace ( *(p->p) ) && rMemPtrBin_Skip ( p, 1 ) ); }
 /* Пропускает все isspace() байты, возвращает количество оставшихся байт */
 static UINT rMemPtrBin_Skip_ToFirstNonSpace ( struct mem_ptr_bin * const p )
 { while ( rMemPtrBin_Skip_1ByteIfSpace ( p ) ); return p->n; }
@@ -175,10 +175,10 @@ static BOOL rMemPtrTxt_Skip_1ByteIfNotArraySz ( struct mem_ptr_txt * const p, LP
 
 /* Смещает указатель на один байт если isspace() */
 static BOOL rMemPtrTxt_Skip_1ByteIfSpace ( struct mem_ptr_txt * const p )
-{ return ( p->n && isspace ( *(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
+{ return ( p->n && rStrIsSpace ( (BYTE)*(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
 /* Смещает указатель на один байт если не isspace() */
 static BOOL rMemPtrTxt_Skip_1ByteIfNotSpace ( struct mem_ptr_txt * const p )
-{ return ( p->n && !isspace ( *(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
+{ return ( p->n && !rStrIsSpace ( (BYTE)*(p->p) ) && rMemPtrTxt_Skip ( p, 1 ) ); }
 /* Пропускает все isspace() байты, возвращает количество оставшихся байт */
 static UINT rMemPtrTxt_Skip_ToFirstNonSpace ( struct mem_ptr_txt * const p )
 { while ( rMemPtrTxt_Skip_1ByteIfSpace ( p ) ); return p->n; }
@@ -209,6 +209,14 @@ static UINT rMemPtrTxt_Skip_ToFirstCmpWordA ( struct mem_ptr_txt * const p, LPCS
 { while ( !rMemPtrTxt_CmpWordA ( p, sz ) ) { rMemPtrTxt_Skip ( p, 1 ); } return p->n; }
 static UINT rMemPtrTxt_Skip_ToFirstCmpCaseWordA ( struct mem_ptr_txt * const p, LPCSTR const sz )
 { while ( !rMemPtrTxt_CmpCaseWordA ( p, sz ) ) { rMemPtrTxt_Skip ( p, 1 ); } return p->n; }
+
+/* Удаляет пробелы спереди и сзади */
+static UINT rMemPtrTxt_TrimSpaces ( struct mem_ptr_txt * const p )
+{
+  rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+  while ( p->n ) { if ( rStrIsSpace ( (BYTE)(p->p[p->n-1]) ) ) { --(p->n); } else { return p->n; } }
+  return 0;
+}
 
 /* Пытается преобразовать строку в число, возвращает количество прочитаных символов */
 static UINT rMemPtrTxt_GetUint ( struct mem_ptr_txt * const p, UINT * const pVal )
