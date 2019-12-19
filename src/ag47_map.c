@@ -14,32 +14,30 @@ static WCHAR const g7CharMap[][0x80] =
 
 #define g7CharMapCount (sizeof(g7CharMap)/sizeof(*g7CharMap))
 
-static CHAR const * const g7CharMapNames[g7CharMapCount] =
+static CHAR const * const g7CharMapNames[] =
 {
-  #define _D7x(_a_,_w_,_s_)
-  #define _D7xA(_a_,_w_,_s_)
   #define _D7xPre(_i_,_ss_,_sl_) _sl_,
-  #define _D7xPost()
-  #include "ag47_maps.x"
-  #undef _D7x
-  #undef _D7xA
+  #include "ag47_maps_names.x"
   #undef _D7xPre
-  #undef _D7xPost
-};
-static CHAR const * const g7CharMapCP[g7CharMapCount] =
-{
-  #define _D7x(_a_,_w_,_s_)
-  #define _D7xA(_a_,_w_,_s_)
-  #define _D7xPre(_i_,_ss_,_sl_) "."#_i_,
-  #define _D7xPost()
-  #include "ag47_maps.x"
-  #undef _D7x
-  #undef _D7xA
-  #undef _D7xPre
-  #undef _D7xPost
 };
 
-static _locale_t g7CharMapLocales[g7CharMapCount];
+#define g7CharMapCountU (sizeof(g7CharMapNames)/sizeof(*g7CharMapNames))
+
+static UINT const g7CharMapId[g7CharMapCountU] =
+{
+  #define _D7xPre(_i_,_ss_,_sl_) _i_,
+  #include "ag47_maps_names.x"
+  #undef _D7xPre
+};
+
+static CHAR const * const g7CharMapCP[g7CharMapCountU] =
+{
+  #define _D7xPre(_i_,_ss_,_sl_) "."#_i_,
+  #include "ag47_maps_names.x"
+  #undef _D7xPre
+};
+
+static _locale_t g7CharMapLocales[g7CharMapCountU];
 
 static UINT const g7CodePoint_Rus1[] =
 {
@@ -98,7 +96,7 @@ static UINT rGetBufEndOfLine ( BYTE const * pBuf, UINT nSize )
 
 static UINT rLocalsInit ( )
 {
-  for ( UINT i = 0; i < g7CharMapCount; ++i )
+  for ( UINT i = 0; i < g7CharMapCountU; ++i )
   {
     g7CharMapLocales[i] = _create_locale ( LC_ALL, g7CharMapCP[i] );
     rLog ( L"%-64.64hs%hs\n", g7CharMapNames[i], setlocale ( LC_ALL, g7CharMapCP[i] ) );
@@ -108,7 +106,7 @@ static UINT rLocalsInit ( )
 }
 static UINT rLocalsFree ( )
 {
-  for ( UINT i = 0; i < g7CharMapCount; ++i )
+  for ( UINT i = 0; i < g7CharMapCountU; ++i )
   {
     _free_locale ( g7CharMapLocales[i] );
   }
@@ -183,6 +181,24 @@ static LPCSTR rGetCodePageNameById ( UINT const iCP )
     #include "ag47_maps_names.x"
     #undef _D7xPre
     default: return NULL;
+  }
+}
+/*
+  Получает ID кодовой страницы по номеру
+*/
+static UINT rGetCodePageNumById ( UINT const iCP )
+{
+  __COUNTER__;__COUNTER__;__COUNTER__;
+  __COUNTER__;__COUNTER__;__COUNTER__;
+  __COUNTER__;__COUNTER__;__COUNTER__;
+  __COUNTER__;__COUNTER__;__COUNTER__;
+  enum { k__rGetCodePageNumById = __COUNTER__, };
+  switch ( iCP )
+  {
+    #define _D7xPre(_i_,_ss_,_sl_) case _i_: return __COUNTER__-k__rGetCodePageNumById;
+    #include "ag47_maps_names.x"
+    #undef _D7xPre
+    default: return 0;
   }
 }
 

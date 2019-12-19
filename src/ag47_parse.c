@@ -46,13 +46,16 @@ BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
     const LPWSTR s4wPathTempDir = r4_alloca_s4w ( kPathMax );
     r4_init_s4w_s4w ( s4wPathTempDir, script->s4wPathOutTempDir );
     rFS_NewRandDir_s4w ( s4wPathTempDir ); // .temp/xxxxxxxx/
-    rFS_Run_7Zip ( script, s4wPath, s4wPathTempDir ); // path/filename.zip ==> .temp/xxxxxxxx/
-    --(script->nRecursive);
-    const BOOL b = rFS_Tree ( s4wPath, // .temp/xxxxxxxx/ |] path/filename.zip
-      (BOOL (*)(LPWSTR const,  LPCWSTR const, UINT const, LPVOID const))rParse_FileProc,
-      (BOOL (*)(LPWSTR const,  LPCWSTR const, LPVOID const))rParse_FolderProc,
-      script );
-    ++(script->nRecursive);
+    BOOL b = TRUE ;
+    if ( rFS_Run_7Zip ( script, s4wPath, s4wPathTempDir ) ) // path/filename.zip ==> .temp/xxxxxxxx/
+    {
+      --(script->nRecursive);
+      b = rFS_Tree ( s4wPath, // .temp/xxxxxxxx/ |] path/filename.zip
+        (BOOL (*)(LPWSTR const,  LPCWSTR const, UINT const, LPVOID const))rParse_FileProc,
+        (BOOL (*)(LPWSTR const,  LPCWSTR const, LPVOID const))rParse_FolderProc,
+        script );
+      ++(script->nRecursive);
+    }
     rFS_DeleteTree ( s4wPathTempDir );
     r4_cut_end_s4w ( script->s4wOrigin, n );
     return b;
@@ -60,8 +63,9 @@ BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
   else // Файлы ГИС
   if ( script->ss4wLasFF && r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wLasFF ) )
   {
+    BOOL b = rLas_ParseFile ( script, s4wPath, wszFileName );
     r4_cut_end_s4w ( script->s4wOrigin, n );
-    return TRUE;
+    return b;
   }
   else // Файлы Инклинометрии
   if ( script->ss4wInkFF && r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wInkFF ) )

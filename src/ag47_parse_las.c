@@ -1,24 +1,18 @@
-﻿static UINT rParse_Las_Log_v ( const LPCWSTR fmt, va_list args )
-{
-  static FILE * pF = NULL;
-  if ( !fmt )
-  {
-    if ( pF ) { fclose ( pF ); pF = NULL; return 0; }
-    return 0;
-  }
-  if ( !pF ) { pF = rOpenFileToWriteWith_UTF16_BOM ( L".ag47/.logs/LAS.log" ); }
-  return vfwprintf ( pF, fmt, args );
-}
+﻿/*
 
-static UINT rParse_Las_Log ( const LPCWSTR fmt, ... )
-{
-  va_list args;
-  va_start ( args, fmt );
-  UINT i = rParse_Las_Log_v ( fmt, args );
-  va_end ( args );
-  return i;
-}
-
+  База данных:
+  [^] CODEPAGE    -             [iCP]        -              [ORIGIN] [LINE]
+  [^] NEWLINE     -             [iCP]        -              [ORIGIN] [LINE]
+  [^] CODEPAGE_x  -             [iCP[0]]     -              [ORIGIN] [LINE]
+  [~] [SECTION]   -             [F_LINE]     -              [ORIGIN] [LINE]
+  [#] -           -             [F_LINE]     -              [ORIGIN] [LINE]
+  [*] -           -             [F_LINE]     -              [ORIGIN] [LINE]
+  [V] [MNEM]      [UNITS]       [DATA]      [DESC]          [ORIGIN] [LINE]
+  [W] [MNEM]      [UNITS]       [DATA]      [DESC]          [ORIGIN] [LINE]
+  [C] [MNEM]      [UNITS]       [DATA]      [DESC]          [ORIGIN] [LINE]
+  [P] [MNEM]      [UNITS]       [DATA]      [DESC]          [ORIGIN] [LINE]
+  [O] -           -             [F_LINE]     -              [ORIGIN] [LINE]
+*/
 
 struct las_line_data
 {
@@ -34,14 +28,19 @@ struct las_c_data
   double fSTRT, fSTOP;
 };
 
-
 struct file_state_las
 {
   struct file_map       fm;
+  struct ag47_script  * script;
+  LPCWSTR               wszFileName;    // Название файла
+  UINT                  iCP[2];         // Кодировка
+  UINT                  iNL;            // Символ перехода на новую строку
+
+
   UINT                  iVersion;       // Версия LAS файла
   BOOL                  bWrap;          // Перенос данных
+
   LPCWSTR               s4wOrigin;      // Путь к оригиналу файла
-  LPCWSTR               wszFileName;    // Название файла
   UINT                  iCodePage;      // Номер кодировки
   UINT                  iLineFeed;      // Символ перехода на новую строку
   BYTE                  iSection;       // В какой секции сейчас находимся
@@ -65,6 +64,36 @@ struct file_state_las
   struct las_c_data    *pA_C;           // Все линии секции C
 
 };
+
+
+
+static UINT rParse_Las_Log_v ( const LPCWSTR fmt, va_list args )
+{
+  static FILE * pF = NULL;
+  if ( !fmt )
+  {
+    if ( pF ) { fclose ( pF ); pF = NULL; return 0; }
+    return 0;
+  }
+  if ( !pF ) { pF = rOpenFileToWriteWith_UTF16_BOM ( L".ag47/log/LAS.log" ); }
+  return vfwprintf ( pF, fmt, args );
+}
+
+static UINT rParse_Las_Log ( const LPCWSTR fmt, ... )
+{
+  va_list args;
+  va_start ( args, fmt );
+  UINT i = rParse_Las_Log_v ( fmt, args );
+  va_end ( args );
+  return i;
+}
+
+
+
+
+
+
+
 
 
 INT _rParse_Las_ArraySortCMP ( struct las_line_data const * const p1, struct las_line_data const * const p2 )
@@ -92,7 +121,7 @@ static UINT rParse_Las_ArraySort ( struct las_line_data * const p )
 static UINT rParse_Las_Save ( struct file_state_las * const pL )
 {
   const LPWSTR s4w = r4_alloca_s4w(kPathMax);
-  r4_push_path_s4w_s4w ( s4w, s4wPathOutLasDir );
+  r4_push_path_s4w_s4w ( s4w, pL->script->s4wPathOutLasDir );
   for ( UINT i = 0; i <= 999; ++i )
   {
     swprintf ( s4w+r4_get_count_s4w(s4w), kPathMax-r4_get_count_s4w(s4w),
@@ -583,27 +612,32 @@ static UINT rParse_Las_BeginOfLine ( struct file_state_las * const pL )
 }
 
 
-static UINT rParse_Las ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const LPCWSTR wszFileName )
+
+
+static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4wPath, LPCWSTR const wszFileName )
 {
-  UINT iErr = 0;
-  rLog ( L"Parse_LAS: %-256s ==> %-256s\n", s4wOrigin, s4wPath );
-  struct file_state_las _ = { };
-  if ( ( iErr = rFS_FileMapOpen ( &(_.fm), s4wPath ) ) ) { goto P_End; }
-  _.iVersion            = 0;
-  _.s4wOrigin           = s4wOrigin;
-  _.wszFileName         = wszFileName;
+  rLog ( L"LAS% 9u: %s\n", ++script->nLasDetected, script->s4wOrigin );
+  struct file_state_las _las =
+  {
+    .script             = script,
+    .wszFileName        = wszFileName,
+  };
+  if ( !rFS_FileMapOpen ( &(_las.fm), s4wPath ) ) { return FALSE; }
   UINT a1[g7CharMapCount], a2[g7CharMapCount];
-  _.iCodePage           = rGetBufCodePage ( _.fm.pData, _.fm.nSize, a1, a2 );
-  _.iLineFeed           = rGetBufEndOfLine ( _.fm.pData, _.fm.nSize );
-  _.t.p                 = _.fm.pData;
-  _.t.n                 = _.fm.nSize;
-  _.t.nLine             = 1;
-  _.iSection            = 0;
-  _.nWarnings           = 0;
-  _.fErr                = 0.015;
-  _.pArray              = (struct las_line_data *) r4_malloc_s4s ( 64, sizeof(struct las_line_data) );
-  _.pA_C                = (struct las_c_data *) r4_malloc_s4s ( 2, sizeof(struct las_c_data) );
-  setlocale ( LC_ALL, g7CharMapCP[_.iCodePage] );
+  _las.iCP[1] = rGetBufCodePage ( _las.fm.pData, _las.fm.nSize, a1, a2 );
+  _las.iCP[0] = rGetCodePageNumById ( _las.iCP[1] );
+  _las.iNL    = rGetBuf_NL ( _las.fm.pData, _las.fm.nSize );
+
+  _las.iLineFeed           = rGetBufEndOfLine ( _las.fm.pData, _las.fm.nSize );
+  _las.t.p                 = _las.fm.pData;
+  _las.t.n                 = _las.fm.nSize;
+  _las.t.nLine             = 1;
+  _las.iSection            = 0;
+  _las.nWarnings           = 0;
+  _las.fErr                = 0.015;
+  _las.pArray              = (struct las_line_data *) r4_malloc_s4s ( 64, sizeof(struct las_line_data) );
+  _las.pA_C                = (struct las_c_data *) r4_malloc_s4s ( 2, sizeof(struct las_c_data) );
+  setlocale ( LC_ALL, g7CharMapCP[_las.iCP[1]] );
 #if 0
   static UINT nFile = 0;
   CHAR str[512];
@@ -641,33 +675,34 @@ static UINT rParse_Las ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const LP
   goto P_End;
 #endif
 
-  rParse_Las_Log ( L"%hc\t%hs\t%hs\t%hs\t%hs\t%s\t%u\r\n",
-          '#',
-          "FILESETS",
-          g7CharMapNames[_.iCodePage],
-          g7CharMapCP[_.iCodePage],
-          _.iLineFeed == '\r' ? "CR (Mac)" : _.iLineFeed == '\n' ? "LF (Unix)" : _.iLineFeed == 0x0D0A ? "CRLF (Windows)" : "???",
-          _.s4wOrigin, 0 );
-  for ( UINT k = 0; k < g7CharMapCount; ++k )
-  {
-      rParse_Las_Log ( L"%hc\t%hs\t%hs\t%u\t%u\t%s\t%u\r\n",
-              '#',
-              "CHARMAP_VARS",
-              g7CharMapNames[k],
-              a1[k],
-              a2[k],
-              _.s4wOrigin, 0 );
+  // rParse_Las_Log ( L"%hc\t%hs\t%hs\t%hs\t%hs\t%s\t%u\r\n",
+  //         '#',
+  //         "FILESETS",
+  //         g7CharMapNames[_.iCodePage],
+  //         g7CharMapCP[_.iCodePage],
+  //         _.iLineFeed == '\r' ? "CR (Mac)" : _.iLineFeed == '\n' ? "LF (Unix)" : _.iLineFeed == 0x0D0A ? "CRLF (Windows)" : "???",
+  //         _.s4wOrigin, 0 );
+  // for ( UINT k = 0; k < g7CharMapCount; ++k )
+  // {
+  //     rParse_Las_Log ( L"%hc\t%hs\t%hs\t%u\t%u\t%s\t%u\r\n",
+  //             '#',
+  //             "CHARMAP_VARS",
+  //             g7CharMapNames[k],
+  //             a1[k],
+  //             a2[k],
+  //             _.s4wOrigin, 0 );
 
-  }
+  // }
 
   // Начало файла
-  if ( ( iErr = rParse_Las_BeginOfLine ( &_ ) ) ) { goto P_End; }
+  // if ( ( rParse_Las_BeginOfLine ( &_ ) ) ) { goto P_End; }
 
 
 
-  P_End:
-  r4_free_s4s ( _.pA_C );
-  r4_free_s4s ( _.pArray );
-  rFS_FileMapClose ( &_.fm );
-  return iErr;
+  // P_End:
+  r4_free_s4s ( _las.pA_C );
+  r4_free_s4s ( _las.pArray );
+  rFS_FileMapClose ( &_las.fm );
+  return TRUE;
 }
+

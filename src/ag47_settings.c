@@ -40,13 +40,16 @@ static BOOL rScriptRun ( struct ag47_script * const script )
 
   script->s4wPathOutTempDir = r4_alloca_s4w ( kPathMax );
   r4_init_s4w_s4w ( script->s4wPathOutTempDir, script->s4wOutPath );
-  rFS_AddDir ( script->s4wPathOutTempDir, L"\\.temp", 0 );
+  rFS_AddDir ( script->s4wPathOutTempDir, L"\\tmp", 0 );
   script->s4wPathOutLogsDir = r4_alloca_s4w ( kPathMax );
   r4_init_s4w_s4w ( script->s4wPathOutLogsDir, script->s4wOutPath );
-  rFS_AddDir ( script->s4wPathOutLogsDir, L"\\.logs", 0 );
+  rFS_AddDir ( script->s4wPathOutLogsDir, L"\\log", 0 );
   script->s4wPathOutLasDir = r4_alloca_s4w ( kPathMax );
   r4_init_s4w_s4w ( script->s4wPathOutLasDir, script->s4wOutPath );
   rFS_AddDir ( script->s4wPathOutLasDir, L"\\las", 0 );
+  script->s4wPathOutErrorDir = r4_alloca_s4w ( kPathMax );
+  r4_init_s4w_s4w ( script->s4wPathOutErrorDir, script->s4wOutPath );
+  rFS_AddDir ( script->s4wPathOutErrorDir, L"\\err", 0 );
 
 
   if ( !script->ss4wExcludeFF )
@@ -122,6 +125,7 @@ static BOOL rScript_ParseVal_CP ( struct ag47_script * const script,
     if ( ( *piCP = rGetCodePageIdByAsciiName ( p->p ) ) )
     {
       // Небезопасно!
+      piCP[1] = rGetCodePageNumById ( *piCP );
       while ( rMemPtrTxt_Skip_1ByteIfNotArray ( p, ";\r\n\t", 4 ) );
     }
     else
@@ -162,41 +166,35 @@ static BOOL rScript_ParseVal_NL ( struct ag47_script * const script,
 static BOOL rScript_ParseVal_String ( struct ag47_script * const script,
         struct mem_ptr_txt * const p, LPWSTR * const ps4w )
 {
+
   if ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) && ( *(p->p) == '=' ) &&
        rMemPtrTxt_Skip_NoValid ( p, 1 ) && rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
   {
+    UINT i = 0;
     if ( *ps4w ) { r4_free_s4w ( *ps4w ); *ps4w = NULL; }
     if ( rScript_CaseName ( p, "NULL" ) || *(p->p) == ';' ) { }
     else
-    if ( *(p->p) == '\'' )
-    {
-      rMemPtrTxt_Skip_NoValid ( p, 1 );
-      UINT i = 0;
-      for ( ; i < p->n; ++i ) { if ( p->p[i] == '\'' ) { break; } }
-      UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
-      *ps4w = r4_malloc_s4w ( iW+10 );
-      r4_get_count_s4w ( (*ps4w) ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, *ps4w, iW+1 );
-      (*ps4w)[iW] = 0;
-      rMemPtrTxt_Skip_NoValid ( p, i+1 );
-    }
+    if ( *(p->p) == '\'' && rMemPtrTxt_Skip_NoValid ( p, 1 ) )
+    { for ( ; i < p->n; ++i ) { if ( p->p[i] == '\'' ) { goto P_2; } } goto P_3; }
     else
-    if ( *(p->p) == '\"' )
-    {
-      rMemPtrTxt_Skip_NoValid ( p, 1 );
-      UINT i = 0;
-      for ( ; i < p->n; ++i ) { if ( p->p[i] == '\"' ) { break; } }
-      UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
-      *ps4w = r4_malloc_s4w ( iW+10 );
-      r4_get_count_s4w ( (*ps4w) ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, *ps4w, iW+1 );
-      (*ps4w)[iW] = 0;
-      rMemPtrTxt_Skip_NoValid ( p, i+1 );
-    }
+    if ( *(p->p) == '\"' && rMemPtrTxt_Skip_NoValid ( p, 1 ) )
+    { for ( ; i < p->n; ++i ) { if ( p->p[i] == '\"' ) { goto P_2; } } goto P_3; }
     else
-    { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+    {  P_3: rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+    P_1:
     rMemPtrTxt_Skip_ToFirstNonSpace ( p );
     if ( *(p->p) == ';' ) { return rMemPtrTxt_Skip_NoValid ( p, 1 ); }
     else
     { rLogScript ( script, kErr_Script_EndOfValue ); return FALSE; }
+    P_2:
+    {
+      UINT const iW = MultiByteToWideChar ( script->iCP[0], 0, p->p, i, NULL, 0 );
+      *ps4w = r4_malloc_s4w ( iW+2 );
+      r4_get_count_s4w ( (*ps4w) ) = MultiByteToWideChar ( script->iCP[0], 0, p->p, i, *ps4w, iW+1 );
+      (*ps4w)[iW] = 0;
+      rMemPtrTxt_Skip_NoValid ( p, i+1 );
+      goto P_1;
+    }
   }
   else
   { rLogScript ( script, kErr_Script_EqValue ); return FALSE; }
@@ -263,6 +261,7 @@ static BOOL rScript_ParseVal_VectorOfStrings ( struct ag47_script * const script
       *pss4w = r4_malloc_ss4w ( 4 );
       while ( rMemPtrTxt_Skip_ToFirstNonSpace ( p ) )
       {
+        UINT i = 0;
         if ( *(p->p) == ']' && rMemPtrTxt_Skip_NoValid ( p, 1) ) { break; }
         else
         if ( rScript_CaseName ( p, "NULL" )  )
@@ -272,30 +271,13 @@ static BOOL rScript_ParseVal_VectorOfStrings ( struct ag47_script * const script
         }
         else
         if ( *(p->p) == '\'' && rMemPtrTxt_Skip_NoValid ( p, 1) )
-        {
-          UINT i = 0;
-          for ( ; i < p->n; ++i ) { if ( p->p[i] == '\'' ) { break; } }
-          UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
-          LPWSTR s4w = r4_malloc_s4w ( iW+10 );
-          r4_get_count_s4w ( s4w ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, s4w, iW+1 );
-          s4w[iW] = 0;
-          *pss4w = r4_add_array_ss4w ( *pss4w, &s4w, 1 );
-          rMemPtrTxt_Skip_NoValid ( p, i+1 );
-        }
+        { for ( ; i < p->n; ++i ) { if ( p->p[i] == '\'' ) { goto P_2; } } goto P_3; }
         else
         if ( *(p->p) == '\"' && rMemPtrTxt_Skip_NoValid ( p, 1) )
-        {
-          UINT i = 0;
-          for ( ; i < p->n; ++i ) { if ( p->p[i] == '\"' ) { break; } }
-          UINT iW = MultiByteToWideChar ( script->iCP, 0, p->p, i, NULL, 0 );
-          LPWSTR s4w = r4_malloc_s4w ( iW+10 );
-          r4_get_count_s4w ( s4w ) = MultiByteToWideChar ( script->iCP, 0, p->p, i, s4w, iW+1 );
-          s4w[iW] = 0;
-          *pss4w = r4_add_array_ss4w ( *pss4w, &s4w, 1 );
-          rMemPtrTxt_Skip_NoValid ( p, i+1 );
-        }
+        { for ( ; i < p->n; ++i ) { if ( p->p[i] == '\"' ) { goto P_2; } } goto P_3; }
         else
-        { rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+        { P_3: rLogScript ( script, kErr_Script_InvalidValue ); return FALSE; }
+        P_1:
         // ccc
         rMemPtrTxt_Skip_ToFirstNonSpace ( p );
         if ( *(p->p) == ',' && rMemPtrTxt_Skip_NoValid ( p, 1 ) ) { continue; }
@@ -303,6 +285,16 @@ static BOOL rScript_ParseVal_VectorOfStrings ( struct ag47_script * const script
         if ( *(p->p) == ']' && rMemPtrTxt_Skip_NoValid ( p, 1 ) ) { break; }
         else
         { rLogScript ( script, kErr_Script_ArraySeparator ); return FALSE; }
+        P_2:
+        {
+          UINT const iW = MultiByteToWideChar ( script->iCP[0], 0, p->p, i, NULL, 0 );
+          LPWSTR const s4w = r4_malloc_s4w ( iW+2 );
+          r4_get_count_s4w ( s4w ) = MultiByteToWideChar ( script->iCP[0], 0, p->p, i, s4w, iW+1 );
+          s4w[iW] = 0;
+          *pss4w = r4_add_array_ss4w ( *pss4w, &s4w, 1 );
+          rMemPtrTxt_Skip_NoValid ( p, i+1 );
+          goto P_1;
+        }
       }
     }
     else
@@ -372,7 +364,7 @@ static BOOL rScript_ParseValName_CP ( struct ag47_script * const script,
   {
     const BOOL b = rScript_ParseVal_CP ( script, p, piCP );
     if ( b ) { rLog ( L"script %-16hs %-12hs => %u %hs\r\n", sz, "CODEPAGE",
-            *piCP, rGetCodePageNameById ( *piCP ) ); }
+            *piCP, g7CharMapNames [ piCP[1] ] ); }
     return b;
   }
   return FALSE;
@@ -490,8 +482,8 @@ static BOOL rScript_ParseName ( struct ag47_script * const script, struct mem_pt
   rScript_ParseValName_VectorOfUints ( script, p, &(script->s4uExcludeSizes), "EXCLUDE_SIZE" ) ||
   rScript_ParseValName_NL ( script, p, &(script->iLasNL), "LAS_NL" ) ||
   rScript_ParseValName_NL ( script, p, &(script->iInkNL), "INK_NL" ) ||
-  rScript_ParseValName_CP ( script, p, &(script->iLasCP), "LAS_CP" ) ||
-  rScript_ParseValName_CP ( script, p, &(script->iInkCP), "INK_CP" ) ||
+  rScript_ParseValName_CP ( script, p, script->iLasCP, "LAS_CP" ) ||
+  rScript_ParseValName_CP ( script, p, script->iInkCP, "INK_CP" ) ||
   ( rLogScript ( script, kErr_Script_ValueName ), FALSE );
 }
 
@@ -529,14 +521,15 @@ static VOID rScript_GetCodePage ( struct ag47_script * const script, struct mem_
     rMemPtrBin_Skip ( p, 1 );
     rMemPtrBin_Skip_ToFirstNonSpace ( p ) ;
     const UINT iCP = rGetCodePageIdByAsciiName ( (LPCSTR)p->p );
-    if ( script->iCP && script->iCP != iCP )
+    if ( script->iCP[0] && script->iCP[0] != iCP )
     {
       rLog_Error ( L"script не свопадают BOM скрипта (%hs) и указаная кодировка (%hs)\r\n",
-              rGetCodePageNameById ( script->iCP ), rGetCodePageNameById ( iCP ) );
+              g7CharMapNames [ script->iCP[1] ], rGetCodePageNameById ( iCP ) );
     }
     else
     {
-      script->iCP = iCP;
+      script->iCP[0] = iCP;
+      script->iCP[1] = rGetCodePageNumById ( iCP );
     }
     rMemPtrBin_Skip_ToBeginNewLine ( p );
   }
@@ -551,8 +544,9 @@ static UINT rScriptRunMem ( BYTE const * const pBuf, UINT const nSize )
 {
   struct mem_ptr_bin _ptr = { .p = pBuf, .n = nSize };
   struct ag47_script _script = { .p_bin = &_ptr };
-  _script.iCP = rGetBOM ( &_ptr );
-  if ( ( _script.iCP == 0 ) || ( _script.iCP == kCP_Utf8 ) )
+  _script.iCP[0] = rGetBOM ( &_ptr );
+  _script.iCP[1] = rGetCodePageNumById ( _script.iCP[0] );
+  if ( ( _script.iCP[0] == 0 ) || ( _script.iCP[0] == kCP_Utf8 ) )
   {
     struct mem_ptr_txt _txt = { ._ = _ptr, .nLine = 1, .iNL = rGetBuf_NL ( pBuf, nSize ) };
     _script.p_txt = &_txt;
@@ -561,7 +555,7 @@ static UINT rScriptRunMem ( BYTE const * const pBuf, UINT const nSize )
   }
   else
   {
-    rLog_Error ( L"Code Page\r\n" );
+    rLog_Error ( L"script Code Page\r\n" );
   }
   rScriptFree ( &_script );
   return _script.iErr;

@@ -9,17 +9,20 @@
     struct mem_ptr_bin *p_bin;
     struct mem_ptr_txt *p_txt;
   };
-
-  /* Код ошибки скрипта */
-  UINT                  iErr;
-  /* CodePage самого скрипта */
-  UINT                  iCP;
   /* Путь к оригиналу обрабатываемого файла */
   LPWSTR                s4wOrigin;
 
   LPWSTR                s4wPathOutTempDir;
   LPWSTR                s4wPathOutLogsDir;
   LPWSTR                s4wPathOutLasDir;
+  LPWSTR                s4wPathOutErrorDir;
+
+  /* Код ошибки скрипта */
+  UINT                  iErr;
+  /* CodePage самого скрипта */
+  UINT                  iCP[2];
+  /* Количество обработанных LAS файлов */
+  UINT                  nLasDetected;
 
 
 
@@ -103,9 +106,11 @@
     По умолчанию {0} или {NULL} или {FALSE}
     Возможные значения:
       {0}               - Отключить модификацию
-      {1}               - Включить модифицаию без дополнительной информации
-      {2}               - Добавить информацию в заголовке файла
-      {3}               - Добавить к файлу отладочную информацию
+      {+0x1}            - Включить преобразование кодировок и символа конца линии
+      {+0x2}            - Добавить информацию в заголовке файла
+      {+0x4}            - Отчистить от комментариев
+      {+0x10}           - Добавить к файлу отладочную информацию
+      {+0x20}           - Добавить данне файлы к БД
   */
   UINT                  iLasMod;
   /*  LAS_NL
@@ -127,7 +132,7 @@
       {1251}, {".1251"}, {"windows-1251"}     - ANSI Cyrillic; Cyrillic (Windows)
       Остальные по ссылке [https://docs.microsoft.com/en-us/windows/win32/Intl/code-page-identifiers]
   */
-  UINT                  iLasCP;
+  UINT                  iLasCP[2];
 
   // === INK === === === === === === === === === === === === === === === === === === === === === ===
   /*  INK_FF
@@ -156,7 +161,7 @@
       {1251}, {".1251"}, {"windows-1251"}     - ANSI Cyrillic; Cyrillic (Windows)
       Остальные по ссылке [https://docs.microsoft.com/en-us/windows/win32/Intl/code-page-identifiers]
   */
-  UINT                  iInkCP;
+  UINT                  iInkCP[2];
 };
 
 enum
