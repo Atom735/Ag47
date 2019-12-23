@@ -22,10 +22,21 @@ struct las_line_data
           aMNEM, aUNIT, aDATA, aDESC, aLine;
 };
 
-struct las_c_data
+struct las_data_s
 {
   struct file_data_ptr
           aMNEM, aUNIT, aDATA, aDESC, aLine;
+  union {
+      double d;
+      INT i;
+      UINT u;
+      BOOL b;
+  };
+};
+
+struct las_data_a
+{
+  struct mem_ptr_txt s;
   double fSTRT, fSTOP;
 };
 
@@ -41,6 +52,10 @@ struct file_state_las
   struct mem_ptr_txt    s,              // Указатель обработки файла
       aMNEM, aUNIT, aDATA, aDESC, aLine;// Переменные обработки линии
 
+  struct mem_ptr_txt    w_WELL;
+  double                w_STRT, w_STOP, w_STEP, w_NULL;
+
+  struct las_data_a   * aCurves;
 
   UINT                  iVersion;       // Версия LAS файла
   BOOL                  bWrap;          // Перенос данных
@@ -508,61 +523,190 @@ static UINT rParse_Las_S_V ( struct file_state_las * const pL )
 }
 #endif
 
-
-static BOOL rLas_ParseSection_Version ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+static UINT rLogLas_ ( LPCSTR const szFile, UINT const nLine,
+        struct file_state_las * const las, UINT const iErr )
 {
-  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  las->iErr = iErr;
+  return rLog_Error_ ( szFile,  nLine, L"las on line (%u): %-*.*hs\r\n  error 0x%x => %s\r\n",
+          las->s.nLine, las->s.n < 16 ? las->s.n : 16,
+          las->s.n < 16 ? las->s.n : 16,
+          las->s.p, iErr, g7ErrStrScript[iErr] );
+}
+#define rLogLas(_s_,_i_) rLogLas_(__FILE__,__LINE__,_s_,_i_)
+
+static BOOL rLas_ParseSection_End ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
   las->aLine.n -= p->n;
+  rMemPtrTxt_Skip_ToBeginNewLine ( p );
+  rMemPtrTxt_TrimSpaces ( &(las->aDATA) );
+  rMemPtrTxt_TrimSpaces ( &(las->aDESC) );
+  rMemPtrTxt_TrimSpaces ( &(las->aLine) );
   rMemPtrTxt_TrimSpaces ( &(las->aLine) );
   rLas_LogToDB ( las, L"*\t\t\t%.*hs\t\t%s\t%u\r\n",  las->aLine.n,  las->aLine.p, las->script->s4wOrigin, las->aLine.nLine );
   rLas_LogToDB ( las, L"V\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
           las->aMNEM.n,  las->aMNEM.p,
           las->aUNIT.n,  las->aUNIT.p,
-          0,  las->aDATA.p,
-          0,  las->aDESC.p,
+          las->aDATA.n,  las->aDATA.p,
+          las->aDESC.n,  las->aDESC.p,
           las->script->s4wOrigin, las->aLine.nLine );
+  return TRUE;
+}
+
+static BOOL rLas_ParseData2 ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  las->aDESC = *p;
+  las->aDATA = ((struct mem_ptr_txt){ });
+  rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+  do
+  {
+    if ( rMemPtrTxt_IsNewLine ( p ) )
+    {
+      if ( las->aDESC.p == NULL )
+      {
+        rLogLas ( las, kErr_ParserLas_EOL_DoublePoint );
+        return FALSE;
+      }
+      las->aDATA.n -= p->n;
+      return rLas_ParseSection_End ( las, p );
+    }
+    else
+    if ( *(p->p) == ':' && las->aDATA.p == NULL )
+    {
+      las->aDESC.n -= p->n;
+      rMemPtrTxt_TrimSpaces ( &(las->aDESC) );
+      rMemPtrTxt_Skip_NoValid ( p, 1 );
+      las->aDATA = *p;
+    }
+  } while ( rMemPtrTxt_Skip_NoValid ( p, 1 ) );
+  rLogLas ( las, kErr_ParserLas_EOF_DoublePoint );
+  return FALSE;
+}
+
+static BOOL rLas_ParseData1 ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+  las->aDESC = ((struct mem_ptr_txt){ });
+  las->aDATA = *p;
+  do
+  {
+    if ( rMemPtrTxt_IsNewLine ( p ) )
+    {
+      if ( las->aDESC.p == NULL )
+      {
+        rLogLas ( las, kErr_ParserLas_EOL_DoublePoint );
+        return FALSE;
+      }
+      las->aDATA.n -= las->aDESC.n+1;
+      las->aDESC.n -= p->n;
+      return rLas_ParseSection_End ( las, p );
+    }
+    else
+    if ( *(p->p) == ':' )
+    {
+      rMemPtrTxt_Skip_NoValid ( p, 1 );
+      las->aDESC = *p;
+    }
+  } while ( rMemPtrTxt_Skip_NoValid ( p, 1 ) );
+  rLogLas ( las, kErr_ParserLas_EOF_DoublePoint );
+  return FALSE;
+}
+
+
+
+static BOOL rLas_ParseSection_Version ( struct file_state_las * const las, struct mem_ptr_txt * const p )
+{
+  if ( !rLas_ParseData1 ( las, p ) ) { return FALSE; }
+  if ( rMemPtrTxt_CmpArrayA ( &(las->aMNEM), "VERS" ) )
+  {
+    const double d = _atof_l ( las->aDATA.p, g_locale_C );
+    if ( d == 1.2 ) { las->iVersion = 1; }
+    else
+    if ( d == 2.0 ) { las->iVersion = 2; }
+    else
+    if ( las->iVersion != 1 && las->iVersion != 2 )
+    { rLogLas ( las, kErr_ParserLas_IncorrectVersion ); return FALSE; }
+  }
+  else
+  if ( rMemPtrTxt_CmpArrayA ( &(las->aMNEM), "WRAP" ) )
+  {
+    if ( rMemPtrTxt_CmpArrayA ( &(las->aDATA), "YES" ) ) { las->bWrap = TRUE; }
+    else
+    if ( rMemPtrTxt_CmpArrayA ( &(las->aDATA), "NO" ) ) { las->bWrap = FALSE; }
+    else
+    {
+      rLogLas ( las, kErr_ParserLas_IncorrectWrap );
+      return FALSE;
+    }
+  }
+  else
+  {
+    rLogLas ( las, kErr_ParserLas_UndefinedMnem );
+    return FALSE;
+  }
   return TRUE;
 }
 static BOOL rLas_ParseSection_Well ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
-  rMemPtrTxt_Skip_ToBeginNewLine ( p );
-  las->aLine.n -= p->n;
-  rMemPtrTxt_TrimSpaces ( &(las->aLine) );
-  rLas_LogToDB ( las, L"*\t\t\t%.*hs\t\t%s\t%u\r\n",  las->aLine.n,  las->aLine.p, las->script->s4wOrigin, las->aLine.nLine );
-  rLas_LogToDB ( las, L"W\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
-          las->aMNEM.n,  las->aMNEM.p,
-          las->aUNIT.n,  las->aUNIT.p,
-          0,  las->aDATA.p,
-          0,  las->aDESC.p,
-          las->script->s4wOrigin, las->aLine.nLine );
+  if ( rMemPtrTxt_CmpArrayA ( &(las->aMNEM), "STRT" ) )
+  {
+    if ( !rLas_ParseData1 ( las, p ) ||
+            !rMemPtrTxt_GetDouble_NoSkip ( &(las->aDATA), &(las->w_STRT) ) ) { return FALSE; }
+  }
+  else
+  if ( rMemPtrTxt_CmpArrayA ( &(las->aMNEM), "STOP" ) )
+  {
+    if ( !rLas_ParseData1 ( las, p ) ||
+            !rMemPtrTxt_GetDouble_NoSkip ( &(las->aDATA), &(las->w_STOP) ) ) { return FALSE; }
+    las->w_STOP = atof ( las->aDATA.p );
+  }
+  else
+  if ( rMemPtrTxt_CmpArrayA ( &(las->aMNEM), "STEP" ) )
+  {
+    if ( !rLas_ParseData1 ( las, p ) ||
+            !rMemPtrTxt_GetDouble_NoSkip ( &(las->aDATA), &(las->w_STEP) ) ) { return FALSE; }
+    if ( las->w_STEP == 0.0 ) { rLogLas ( las, kErr_ParserLas_CantReadAscii ); return FALSE; }
+  }
+  else
+  if ( rMemPtrTxt_CmpArrayA ( &(las->aMNEM), "NULL" ) )
+  {
+    if ( !rLas_ParseData1 ( las, p ) ||
+            !rMemPtrTxt_GetDouble_NoSkip ( &(las->aDATA), &(las->w_NULL) ) ) { return FALSE; }
+  }
+  else
+  {
+    if ( las->iVersion == 2 && !rLas_ParseData1 ( las, p ) ) { return FALSE; }
+    else
+    if ( las->iVersion == 1 && !rLas_ParseData2 ( las, p ) ) { return FALSE; }
+    else
+    if ( las->iVersion != 1 && las->iVersion != 2 )
+    { rLogLas ( las, kErr_ParserLas_IncorrectVersion ); return FALSE; }
+    if ( rMemPtrTxt_CmpArrayA ( &(las->aMNEM), "WELL" ) )
+    {
+      las->w_WELL = las->aDATA;
+    }
+  }
   return TRUE;
 }
 static BOOL rLas_ParseSection_Curve ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
-  rMemPtrTxt_Skip_ToBeginNewLine ( p );
-  las->aLine.n -= p->n;
-  rMemPtrTxt_TrimSpaces ( &(las->aLine) );
-  rLas_LogToDB ( las, L"*\t\t\t%.*hs\t\t%s\t%u\r\n",  las->aLine.n,  las->aLine.p, las->script->s4wOrigin, las->aLine.nLine );
-  rLas_LogToDB ( las, L"C\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
-          las->aMNEM.n,  las->aMNEM.p,
-          las->aUNIT.n,  las->aUNIT.p,
-          0,  las->aDATA.p,
-          0,  las->aDESC.p,
-          las->script->s4wOrigin, las->aLine.nLine );
+  if ( las->iVersion == 2 && !rLas_ParseData1 ( las, p ) ) { return FALSE; }
+  else
+  if ( las->iVersion == 1 && !rLas_ParseData1 ( las, p ) ) { return FALSE; }
+  else
+  if ( las->iVersion != 1 && las->iVersion != 2 )
+  { rLogLas ( las, kErr_ParserLas_IncorrectVersion ); return FALSE; }
+
+  las->aCurves = r4_add_array_s4s ( las->aCurves, &((struct las_data_a){ .s = las->aMNEM }), 1 );
   return TRUE;
 }
 static BOOL rLas_ParseSection_Param ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
-  rMemPtrTxt_Skip_ToBeginNewLine ( p );
-  las->aLine.n -= p->n;
-  rMemPtrTxt_TrimSpaces ( &(las->aLine) );
-  rLas_LogToDB ( las, L"*\t\t\t%.*hs\t\t%s\t%u\r\n",  las->aLine.n,  las->aLine.p, las->script->s4wOrigin, las->aLine.nLine );
-  rLas_LogToDB ( las, L"P\t%.*hs\t%.*hs\t%.*hs\t%.*hs\t%s\t%u\r\n",
-          las->aMNEM.n,  las->aMNEM.p,
-          las->aUNIT.n,  las->aUNIT.p,
-          0,  las->aDATA.p,
-          0,  las->aDESC.p,
-          las->script->s4wOrigin, las->aLine.nLine );
+  if ( las->iVersion == 2 && !rLas_ParseData1 ( las, p ) ) { return FALSE; }
+  else
+  if ( las->iVersion == 1 && !rLas_ParseData1 ( las, p ) ) { return FALSE; }
+  else
+  if ( las->iVersion != 1 && las->iVersion != 2 )
+  { rLogLas ( las, kErr_ParserLas_IncorrectVersion ); return FALSE; }
   return TRUE;
 }
 
@@ -575,7 +719,7 @@ static BOOL rLas_ParseLine_DATA ( struct file_state_las * const las, struct mem_
     case 'C': return rLas_ParseSection_Curve ( las, p );
     case 'P': return rLas_ParseSection_Param ( las, p );
     default:
-      rLog_Error ( L" => Line %u: Неопределённая секция\r\n", p->nLine );
+      rLogLas ( las, kErr_ParserLas_Section );
       return FALSE;
   }
 }
@@ -586,7 +730,7 @@ static BOOL rLas_ParseLine_UNIT ( struct file_state_las * const las, struct mem_
   do {
     if ( rMemPtrTxt_IsNewLine ( p ) )
     {
-      rLog_Error ( L" => Line %u: Непредвиденный конец строки (отсутсвует пробел после точки)\r\n", p->nLine );
+      rLogLas ( las, kErr_ParserLas_EOL_Space );
       return rMemPtrTxt_Skip_ToBeginNewLine ( p );
     }
     else
@@ -597,7 +741,7 @@ static BOOL rLas_ParseLine_UNIT ( struct file_state_las * const las, struct mem_
       return rLas_ParseLine_DATA ( las, p );
     }
   } while ( rMemPtrTxt_Skip_NoValid ( p, 1 ) );
-  rLog_Error ( L" => Line %u: Непредвиденный конец файла (отсутсвует пробел после точки)\r\n", p->nLine );
+  rLogLas ( las, kErr_ParserLas_EOF_Space );
   return FALSE;
 }
 
@@ -623,7 +767,7 @@ static BOOL rLas_ParseLine_MNEM ( struct file_state_las * const las, struct mem_
   do {
     if ( rMemPtrTxt_IsNewLine ( p ) )
     {
-      rLog_Error ( L" => Line %u: Непредвиденный конец строки (отсутсвует точка)\r\n", p->nLine );
+      rLogLas ( las, kErr_ParserLas_EOL_Point );
       return rMemPtrTxt_Skip_ToBeginNewLine ( p );
     }
     else
@@ -635,12 +779,95 @@ static BOOL rLas_ParseLine_MNEM ( struct file_state_las * const las, struct mem_
       return rLas_ParseLine_UNIT ( las, p );
     }
   } while ( rMemPtrTxt_Skip_NoValid ( p, 1 ) );
-  rLog_Error ( L" => Line %u: Непредвиденный конец файла (отсутсвует точка)\r\n", p->nLine );
+  rLogLas ( las, kErr_ParserLas_EOF_Point );
   return FALSE;
 }
 
 static BOOL rLas_ParseSection_Ascii ( struct file_state_las * const las, struct mem_ptr_txt * const p )
 {
+  rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+  const UINT nCC = r4_get_count_s4s ( las->aCurves ); // Количество данных в строке
+  for ( UINT i = 0; i < nCC; ++i )
+  {
+    las->aCurves[i].fSTRT = max ( las->w_STRT, las->w_STOP ) + 1000.0;
+    las->aCurves[i].fSTOP = min ( las->w_STRT, las->w_STOP ) - 1000.0;
+  }
+  double fDepth;
+  if ( rMemPtrTxt_GetDouble ( p, &fDepth ) == 0 )
+  {
+    rLogLas ( las, kErr_ParserLas_CantReadAscii_First );
+    return FALSE;
+  }
+  rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+
+  if ( fabs ( fDepth - las->w_STRT ) > las->script->fLasErr )
+  {
+    rLogLas ( las, kErr_ParserLas_FistDepthNotEaqual );
+    return FALSE;
+  }
+
+  P_A:
+  if ( las->aCurves[0].fSTRT >= fDepth ) { las->aCurves[0].fSTRT = fDepth; }
+  if ( las->aCurves[0].fSTOP <= fDepth ) { las->aCurves[0].fSTOP = fDepth; }
+  for ( UINT i = 1; i < nCC; ++i )
+  {
+    if ( p->n == 0 )
+    {
+      rLogLas ( las, kErr_ParserLas_EOF );
+      return FALSE;
+    }
+    double f;
+    if ( rMemPtrTxt_GetDouble ( p, &f ) == 0 )
+    {
+      rLogLas ( las, kErr_ParserLas_CantReadAscii );
+      return FALSE;
+    }
+    rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+    if ( fabs ( f - las->w_NULL ) > las->script->fLasErr )
+    {
+      // если верхняя граница ниже настоящего значения, то записываем и с другой границе также
+      if ( las->aCurves[i].fSTRT >= fDepth ) { las->aCurves[i].fSTRT = fDepth; }
+      if ( las->aCurves[i].fSTOP <= fDepth ) { las->aCurves[i].fSTOP = fDepth; }
+    }
+  }
+
+  if ( fabs ( fDepth - las->w_STOP ) > las->script->fLasErr )
+  {
+    if ( p->n == 0 )
+    {
+      rLogLas ( las, kErr_ParserLas_EOF );
+      return FALSE;
+    }
+    double _f;
+    if ( rMemPtrTxt_GetDouble ( p, &_f ) == 0 )
+    {
+      rLogLas ( las, kErr_ParserLas_CantReadAscii );
+      return FALSE;
+    }
+    rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+    if ( fabs ( fabs ( _f - fDepth ) - fabs ( las->w_STEP ) ) > las->script->fLasErr )
+    {
+      rLogLas ( las, kErr_ParserLas_IncorrectDepthGap );
+      return FALSE;
+    }
+    fDepth = _f;
+    goto P_A;
+  }
+  else
+  {
+    rMemPtrTxt_Skip_ToFirstNonSpace ( p );
+    if ( p->n != 0 )
+    {
+      // rLogLas ( las, kErr_ParserLas_NotEOF );
+      // return FALSE;
+    }
+  }
+
+  for ( UINT i = 0; i < nCC; ++i )
+  {
+    rLog ( L"  ==> [%u]: %-16.*hs % 10.4f % 10.4f\n",
+        i, las->aCurves[i].s.n, las->aCurves[i].s.p, las->aCurves[i].fSTRT, las->aCurves[i].fSTOP );
+  }
   return FALSE;
 }
 
@@ -677,7 +904,7 @@ static BOOL rLas_ParseLine_Head ( struct file_state_las * const las, struct mem_
           las->iSection = p->p[1]; return rLas_SkipLineSecton ( las, p );
         case 'A': las->iSection = p->p[1]; return rLas_SkipLineSecton ( las, p ) && rLas_ParseSection_Ascii ( las, p );
         default:
-          rLog_Error ( L" => Line %u: Неизвестное название секции\r\n", p->nLine );
+          rLogLas ( las, kErr_ParserLas_Section );
           return FALSE;
       }
     }
@@ -691,7 +918,7 @@ static BOOL rLas_ParseLine_Head ( struct file_state_las * const las, struct mem_
       return rLas_ParseLine_MNEM ( las, p );
     }
   }
-  rLog_Error ( L" => Line %u: Непредвиденный конец файла\r\n", p->nLine );
+  rLogLas ( las, kErr_ParserLas_EOF );
   return FALSE;
 }
 
@@ -715,6 +942,7 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
           .n = _las.fm.nSize,
           .nLine = 1,
           .iNL = rGetBuf_NL ( _las.fm.pData, _las.fm.nSize ) });
+  _las.aCurves = r4_malloc_s4s ( 8, sizeof(struct las_data_a) );
 
 
   rLas_LogToDB ( &_las, L"^\tCODEPAGE\t%u\t%hs\t\t%s\t\r\n", _las.iCP[0], g7CharMapNames[_las.iCP[1]], script->s4wOrigin );
@@ -741,6 +969,50 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
   r4_init_s4w_s4w ( _las.s4wTempOut, script->s4wPathOutTempDir );
   rFS_NewRandDir_s4w ( _las.s4wTempOut ); // .temp/xxxxxxxx/
   while ( rLas_ParseLine_Head ( &_las, &(_las.s) ) ) { }
+  if ( _las.iErr )
+  {
+    LPWSTR s4wPath = r4_alloca_s4w ( kPathMax );
+    r4_init_s4w_s4w ( s4wPath, script->s4wPathOutErrorDir );
+    r4_get_count_s4w ( s4wPath ) += swprintf ( s4wPath + r4_get_count_s4w ( s4wPath ),
+            kPathMax - r4_get_count_s4w ( s4wPath ), L"\\%04u.las", (++script->nErrorFiles) );
+    FILE * const pF = _wfopen ( s4wPath, L"wb" );
+    fprintf ( pF, "# Ag47_CodePage: [.%u] %s", _las.iCP[0], g7CharMapNames[_las.iCP[1]] );
+    fprintf ( pF, rGetNlStr(_las.s.iNL) );
+    fprintf ( pF, "# Ag47_LineFeed: %s", rGetNlName(_las.s.iNL) );
+    fprintf ( pF, rGetNlStr(_las.s.iNL) );
+    fprintf ( pF, "# Ag47_ErrorLine: %u", _las.s.nLine+5 );
+    fprintf ( pF, rGetNlStr(_las.s.iNL) );
+    fprintf ( pF, "# Ag47_ErrorCode: 0x%x", _las.iErr );
+    fprintf ( pF, rGetNlStr(_las.s.iNL) );
+    fprintf ( pF, "# Ag47_ErrorDesc: %ls", g7ErrStrScript[_las.iErr] );
+    fprintf ( pF, rGetNlStr(_las.s.iNL) );
+    fwrite ( _las.fm.pData, 1, _las.fm.nSize, pF );
+    fclose ( pF );
+  }
+  else
+  {
+    LPWSTR const s4w = r4_alloca_s4w ( kPathMax );
+    r4_push_path_s4w_s4w ( s4w, script->s4wPathOutLasDir );
+    for ( UINT i = 1; TRUE; ++i )
+    {
+      swprintf ( s4w+r4_get_count_s4w(s4w), kPathMax-r4_get_count_s4w(s4w),
+              L"\\%.*hs_%s_%u.LAS",
+              _las.w_WELL.n, _las.w_WELL.p,
+              _las.wszFileName, i );
+      FILE * const pf = _wfopen ( s4w, L"rb" );
+      if ( pf ) { fclose ( pf ); } else { break; }
+    }
+    FILE * const pf = _wfopen ( s4w, L"wb" );
+    if ( pf )
+    {
+      fwrite ( _las.fm.pData, 1, _las.fm.nSize, pf );
+      fclose ( pf );
+    }
+    else
+    {
+      rLog_Error ( L"Невозможно открыть файл для записи [%s]\n", s4w );
+    }
+  }
   rFS_DeleteTree ( _las.s4wTempOut );
 
 #if 0
@@ -807,7 +1079,9 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
   // P_End:
   // r4_free_s4s ( _las.pA_C );
   // r4_free_s4s ( _las.pArray );
+  if ( _las.aCurves ) { r4_free_s4s ( _las.aCurves ); }
   rFS_FileMapClose ( &_las.fm );
-  return _las.iErr == 0;
+  return TRUE;
+  // return _las.iErr == 0;
 }
 

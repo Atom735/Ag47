@@ -1,2 +1,2 @@
-﻿RUN = "\\NAS\Public\common\Gilyazeev\ГИС";
+﻿OUT_RECREATE=TRUE;RUN="\\NAS\Public\common\Gilyazeev\ГИС";
 

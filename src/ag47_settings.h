@@ -25,6 +25,8 @@
   UINT                  nLasDetected;
   /* Файл базы данных всех обработаных LAS файлов  */
   FILE                * pFLasDB;
+  /* Количество файлов с ошибкой */
+  UINT                  nErrorFiles;
 
 
 
@@ -135,6 +137,11 @@
       Остальные по ссылке [https://docs.microsoft.com/en-us/windows/win32/Intl/code-page-identifiers]
   */
   UINT                  iLasCP[2];
+  /* LAS_ERR
+    Значение ошибки погрешности для расчёта секций ASCII
+    По умолчанию {0.0} - переходит {в 1e-6}
+  */
+  double                fLasErr;
 
   // === INK === === === === === === === === === === === === === === === === === === === === === ===
   /*  INK_FF
@@ -169,21 +176,63 @@
 enum
 {
   kErr_Ok = 0,
+
   kErr_Script_InvalidValue,
   kErr_Script_EndOfValue,
   kErr_Script_EqValue,
   kErr_Script_ErrSymbol,
   kErr_Script_ValueName,
   kErr_Script_ArraySeparator,
+
+  kErr_ParserLas_Section,
+  kErr_ParserLas_EOF_DoublePoint,
+  kErr_ParserLas_EOL_DoublePoint,
+  kErr_ParserLas_EOF_Space,
+  kErr_ParserLas_EOL_Space,
+  kErr_ParserLas_EOF_Point,
+  kErr_ParserLas_EOL_Point,
+  kErr_ParserLas_EOF,
+
+  kErr_ParserLas_UndefinedMnem,
+  kErr_ParserLas_IncorrectVersion,
+  kErr_ParserLas_IncorrectWrap,
+
+  kErr_ParserLas_CantReadAscii_First,
+  kErr_ParserLas_CantReadAscii,
+  kErr_ParserLas_FistDepthNotEaqual,
+  kErr_ParserLas_IncorrectDepthGap,
+  kErr_ParserLas_NotEOF,
 };
 
 LPCWSTR const g7ErrStrScript[] =
 {
   [kErr_Ok]                             = L"Всё в порядке",
+
   [kErr_Script_InvalidValue]            = L"Ошибка синтаксиса, некорректное значение",
   [kErr_Script_EndOfValue]              = L"Ошибка синтаксиса, отсуствует символ \';\'",
   [kErr_Script_EqValue]                 = L"Ошибка синтаксиса, отсуствует символ \'=\'",
   [kErr_Script_ErrSymbol]               = L"Ошибка синтаксиса, непредвиденный символ",
   [kErr_Script_ValueName]               = L"Неизвестное название переменной",
   [kErr_Script_ArraySeparator]          = L"Ошибка синтаксиса, отсутсвует разделитель \',\'",
+
+  [kErr_ParserLas_Section]              = L"Неопределённая секция",
+  [kErr_ParserLas_EOF_DoublePoint]      = L"Непредвиденный конец файла (отсутсвует двоеточие)",
+  [kErr_ParserLas_EOL_DoublePoint]      = L"Непредвиденный конец строки (отсутсвует двоеточие)",
+  [kErr_ParserLas_EOF_Space]            = L"Непредвиденный конец файла (отсутсвует пробел после точки)",
+  [kErr_ParserLas_EOL_Space]            = L"Непредвиденный конец строки (отсутсвует пробел после точки)",
+  [kErr_ParserLas_EOF_Point]            = L"Непредвиденный конец файла (отсутсвует точка)",
+  [kErr_ParserLas_EOL_Point]            = L"Непредвиденный конец строки (отсутсвует точка)",
+  [kErr_ParserLas_EOF]                  = L"Непредвиденный конец файла",
+
+  [kErr_ParserLas_UndefinedMnem]        = L"Неизвестная мнемоника",
+  [kErr_ParserLas_IncorrectVersion]     = L"Некооректное значение версии LAS файла",
+  [kErr_ParserLas_IncorrectWrap]        = L"Некооректное значение флага многострочности данных",
+
+  [kErr_ParserLas_CantReadAscii_First]  = L"Невозможо прочесть первое значение глубины",
+  [kErr_ParserLas_CantReadAscii]        = L"Невозможо прочесть значение",
+  [kErr_ParserLas_FistDepthNotEaqual]   = L"Первое значение глубины не совпадает с полем ~W:STRT",
+  [kErr_ParserLas_IncorrectDepthGap]    = L"Непредвиденый разрыв значения глубин",
+  [kErr_ParserLas_NotEOF]               = L"Излишние данные в конце файла",
+
+
 };

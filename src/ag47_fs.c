@@ -43,6 +43,7 @@ static BOOL rFS_SearchExe_Wordconv ( LPWSTR const s4w )
     HANDLE const _hFind = FindFirstFile ( s4w, &_ffd );
     if ( _hFind != INVALID_HANDLE_VALUE )
     {
+      rLog ( L"!INFO: [wordconv.exe] найден по пути: %s\r\n", s4w );
       FindClose ( hFind );
       return TRUE;
     }
@@ -198,6 +199,20 @@ static BOOL rFS_AddDir ( LPWSTR const s4w, LPCWSTR const wsz, UINT const k )
 }
 
 /*
+  Создаёт все промежуточные папки
+*/
+static BOOL rFS_CreatesDirsForPath ( LPWSTR const s4w )
+{
+  UINT const i = SHCreateDirectoryEx ( NULL, s4w, NULL );
+  if ( i != ERROR_SUCCESS )
+  {
+    rLog_Error_WinAPI ( SHCreateDirectoryEx, i, L"%s\n", s4w );
+    return i == ERROR_FILE_EXISTS || i == ERROR_ALREADY_EXISTS;
+  }
+  return TRUE;
+}
+
+/*
   Поиск файлов в папке
   s4wPath               => путь к дериктории где производится поиск,
                         в конце будет приписано окончание \* для поиска всех файлов
@@ -294,9 +309,15 @@ BOOL rFS_DeleteTree_FolderProc ( LPWSTR const s4wPath, LPCWSTR const wszFolderNa
 */
 static BOOL rFS_DeleteTree ( const LPWSTR s4w )
 {
-  if ( !rFS_Tree ( s4w, rFS_DeleteTree_FileProc, rFS_DeleteTree_FolderProc, NULL ) ) { return FALSE; }
-  if ( !RemoveDirectory ( s4w ) ) { rLog_Error_WinAPI ( RemoveDirectory, GetLastError(), L"%s\r\n", s4w ); return FALSE; }
-  return TRUE;
+  // if ( !rFS_Tree ( s4w, rFS_DeleteTree_FileProc, rFS_DeleteTree_FolderProc, NULL ) ) { return FALSE; }
+  // if ( !RemoveDirectory ( s4w ) ) { rLog_Error_WinAPI ( RemoveDirectory, GetLastError(), L"%s\r\n", s4w ); return FALSE; }
+  s4w[r4_get_count_s4w(s4w)+1] = 0;
+  SHFILEOPSTRUCT file_op = {
+    .wFunc = FO_DELETE,
+    .pFrom = s4w,
+    .fFlags = FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
+  };
+  return SHFileOperation ( &file_op ) == 0;
 }
 
 struct file_map

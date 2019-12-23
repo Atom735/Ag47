@@ -56,6 +56,16 @@ static LPCSTR rGetNlName ( UINT const i )
     default: return "???";
   }
 }
+static LPCSTR rGetNlStr ( UINT const i )
+{
+  switch ( i )
+  {
+    case kNewLine_CRLF: return "\r\n";
+    case kNewLine_LF: return "\n";
+    case kNewLine_CR: return "\r";
+    default: return "???";
+  }
+}
 
 /* Сравнивает память и слово, возвращает длину слова при совпадении */
 static UINT rStrCmpArrayAA ( const LPCSTR p, const UINT n, const LPCSTR p2 )
@@ -141,7 +151,7 @@ struct mem_ptr_txt
 };
 
 /* Возвращает длину символа перехода на новую строку если указатель указывает на символ новой строки */
-static BOOL rMemPtrTxt_IsNewLine ( struct mem_ptr_txt const * const p )
+static UINT rMemPtrTxt_IsNewLine ( struct mem_ptr_txt const * const p )
 {
   switch ( p->iNL )
   {
@@ -243,6 +253,33 @@ static UINT rMemPtrTxt_GetUint ( struct mem_ptr_txt * const p, UINT * const pVal
   }
   return 0;
 }
+/* Пытается преобразовать строку в число, возвращает количество прочитаных символов */
+static UINT rMemPtrTxt_GetDouble_NoSkip ( struct mem_ptr_txt * const p, double * const pVal )
+{
+  LPSTR s;
+  double const u = _strtod_l ( p->p, &s, g_locale_C );
+  UINT const d = s - p->p;
+  if ( d )
+  {
+    if ( pVal ) { *pVal = u; }
+    return d;
+  }
+  return 0;
+}
+static UINT rMemPtrTxt_GetDouble ( struct mem_ptr_txt * const p, double * const pVal )
+{
+  LPSTR s;
+  double const u = _strtod_l ( p->p, &s, g_locale_C );
+  UINT const d = s - p->p;
+  if ( d )
+  {
+    if ( pVal ) { *pVal = u; }
+    rMemPtrTxt_Skip_NoValid ( p, d );
+    return d;
+  }
+  return 0;
+}
+
 
 struct file_data_ptr    // указатель на данные файла
 {

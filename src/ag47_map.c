@@ -188,10 +188,10 @@ static LPCSTR rGetCodePageNameById ( UINT const iCP )
 */
 static UINT rGetCodePageNumById ( UINT const iCP )
 {
-  __COUNTER__;__COUNTER__;__COUNTER__;
-  __COUNTER__;__COUNTER__;__COUNTER__;
-  __COUNTER__;__COUNTER__;__COUNTER__;
-  __COUNTER__;__COUNTER__;__COUNTER__;
+  // __COUNTER__;__COUNTER__;__COUNTER__;
+  // __COUNTER__;__COUNTER__;__COUNTER__;
+  // __COUNTER__;__COUNTER__;__COUNTER__;
+  // __COUNTER__;__COUNTER__;__COUNTER__;
   enum { k__rGetCodePageNumById = __COUNTER__, };
   switch ( iCP )
   {
