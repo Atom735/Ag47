@@ -63,13 +63,45 @@ BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
   else // Файлы ГИС
   if ( script->ss4wLasFF && r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wLasFF ) )
   {
-    BOOL b = rLas_ParseFile ( script, s4wPath, wszFileName );
+    rLas_ParseFile ( script, s4wPath, wszFileName );
     r4_cut_end_s4w ( script->s4wOrigin, n );
-    return b;
+    return TRUE;
   }
   else // Файлы Инклинометрии
   if ( script->ss4wInkFF && r4_path_match_s4w_by_ss4w ( s4wPath, script->ss4wInkFF ) )
   {
+    struct file_map fm;
+    if ( !rFS_FileMapOpen ( &fm, s4wPath ) ) { goto P_InkEnd; }
+    if ( fm.nSize >= 8 && memcmp ( fm.pData, ((BYTE[]){0xD0,0xCF,0x11,0xE0,0xA1,0xB1,0x1A,0xE1}), 8 ) == 0 )
+    {
+      rFS_FileMapClose ( &fm );
+      // *.doc
+    }
+    else
+    if ( fm.nSize >= 4 && (
+          memcmp ( fm.pData, ((BYTE[]){0x50,0x4B,0x03,0x04}), 4 ) == 0 ||
+          memcmp ( fm.pData, ((BYTE[]){0x50,0x4B,0x05,0x06}), 4 ) == 0 ||
+          memcmp ( fm.pData, ((BYTE[]){0x50,0x4B,0x07,0x08}), 4 ) == 0 ) )
+    {
+      rFS_FileMapClose ( &fm );
+      // *.docx
+    }
+    else
+    {
+      for ( UINT i = 0; i <= fm.nSize && i <= 256; ++i )
+      {
+        if ( fm.pData[i] == 0 )
+        {
+          rFS_FileMapClose ( &fm );
+          // *.dbf
+          goto P_InkEnd;
+        }
+      }
+      rFS_FileMapClose ( &fm );
+      // *.txt
+    }
+
+    P_InkEnd:
     r4_cut_end_s4w ( script->s4wOrigin, n );
     return TRUE;
   }
