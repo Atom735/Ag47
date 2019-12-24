@@ -1,2 +1,4 @@
-﻿OUT_RECREATE=TRUE;RUN="\\NAS\Public\common\Gilyazeev\ГИС";
+﻿OUT_RECREATE=TRUE;
+RECURSIVE=1;
+RUN="\\NAS\Public\common\Gilyazeev\ГИС";
 

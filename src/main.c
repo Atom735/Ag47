@@ -16,10 +16,10 @@
 #include <libxml/parser.h>
 
 #define kPathMax PATH_MAX
-static LPWSTR s4wPathOut = NULL;
-static LPWSTR s4wPathOutTempDir = NULL;
-static LPWSTR s4wPathOutLogsDir = NULL;
-static LPWSTR s4wPathOutLasDir = NULL;
+// static LPWSTR s4wPathOut = NULL;
+// static LPWSTR s4wPathOutTempDir = NULL;
+// static LPWSTR s4wPathOutLogsDir = NULL;
+// static LPWSTR s4wPathOutLasDir = NULL;
 static _locale_t g_locale_C = NULL;
 
 
@@ -29,10 +29,10 @@ static _locale_t g_locale_C = NULL;
 #include "ag47_map.c"
 #include "ag47_arrays.c"
 #include "ag47_fs.c"
-// #include "ag47_parse_docx.c"
-// #include "ag47_parse_txt.c"
+#include "ag47_parse_docx.c"
+#include "ag47_parse_txt.c"
 #include "ag47_parse_las.c"
-// #include "ag47_dbf.c"
+#include "ag47_dbf.c"
 #include "ag47_parse.c"
 #include "ag47_settings.c"
 

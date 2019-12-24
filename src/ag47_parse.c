@@ -76,6 +76,26 @@ BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
     {
       rFS_FileMapClose ( &fm );
       // *.doc
+      const LPWSTR s4wPathTempDoc = r4_alloca_s4w ( kPathMax );
+      r4_init_s4w_s4w ( s4wPathTempDoc, script->s4wPathOutTempDir );
+      rFS_NewRandDir_s4w ( s4wPathTempDoc ); // .temp/xxxxxxxx/
+      const UINT n = r4_get_count_s4w ( s4wPathTempDoc );
+      r4_push_array_s4w_sz ( s4wPathTempDoc, L"\\", 2 );
+      r4_push_array_s4w_sz ( s4wPathTempDoc, wszFileName, 0 );
+      r4_push_array_s4w_sz ( s4wPathTempDoc, L".docx", 6 ); // .temp/xxxxxxxx/filename.docx
+      if ( rFS_Run_WordConv ( script, s4wPath, s4wPathTempDoc ) ) //  path/filename.doc ==> .temp/xxxxxxxx/filename.doc.docx
+      {
+        const LPWSTR s4wPathTempDir = r4_alloca_s4w ( kPathMax );
+        r4_init_s4w_s4w ( s4wPathTempDir, script->s4wPathOutTempDir );
+        rFS_NewRandDir_s4w ( s4wPathTempDir ); // .temp/yyyyyyyy/
+        if ( rFS_Run_7Zip ( script, s4wPathTempDoc, s4wPathTempDir ) ) // .temp/xxxxxxxx/filename.doc.docx ==> .temp/yyyyyyyy/
+        {
+          rParse_Docx ( script, s4wPathTempDir, wszFileName ); // .temp/yyyyyyyy/ |] path/filename.doc |] filename.doc
+        }
+        rFS_DeleteTree ( s4wPathTempDir ); // .temp/yyyyyyyy/
+      }
+      r4_cut_end_s4w ( s4wPathTempDoc, n ); // .temp/xxxxxxxx/
+      rFS_DeleteTree ( s4wPathTempDoc );
     }
     else
     if ( fm.nSize >= 4 && (
@@ -85,6 +105,14 @@ BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
     {
       rFS_FileMapClose ( &fm );
       // *.docx
+      const LPWSTR s4wPathTempDir = r4_alloca_s4w ( kPathMax );
+      r4_init_s4w_s4w ( s4wPathTempDir, script->s4wPathOutTempDir );
+      rFS_NewRandDir_s4w ( s4wPathTempDir ); // .temp/xxxxxxxx/
+      if ( rFS_Run_7Zip ( script, s4wPath, s4wPathTempDir ) ) // path/filename.docx ==> .temp/xxxxxxxx/
+      {
+        rParse_Docx ( script, s4wPathTempDir, wszFileName ); // .temp/xxxxxxxx/ |] path/filename.docx |] filename.docx
+      }
+      rFS_DeleteTree ( s4wPathTempDir ); // .temp/xxxxxxxx/
     }
     else
     {
@@ -94,11 +122,13 @@ BOOL rParse_FileProc ( LPWSTR const s4wPath, LPCWSTR const wszFileName,
         {
           rFS_FileMapClose ( &fm );
           // *.dbf
+          rParse_DBF ( script, s4wPath, wszFileName );
           goto P_InkEnd;
         }
       }
       rFS_FileMapClose ( &fm );
       // *.txt
+      rParse_Txt ( script, s4wPath, wszFileName );
     }
 
     P_InkEnd:

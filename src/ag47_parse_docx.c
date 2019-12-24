@@ -6,7 +6,7 @@
     if ( pF ) { fclose ( pF ); pF = NULL; return 0; }
     return 0;
   }
-  if ( !pF ) { pF = rOpenFileToWriteWith_UTF16_BOM ( L".ag47/.logs/docx.log" ); }
+  if ( !pF ) { pF = rOpenFileToWriteWith_UTF16_BOM ( L".ag47/log/docx.log" ); }
   return vfwprintf ( pF, fmt, args );
 }
 
@@ -454,9 +454,9 @@ void _rDocx_CB_characters ( struct docx_state_ink * const p, const xmlChar * ch,
 /*
   Разбор файла docx, на вход поступает путь к разархивированной папке
 */ // .temp/xxxxxxxx/ |] path/filename.docx |] filename.docx
-static UINT rParse_Docx ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const LPCWSTR wszFileName )
+static UINT rParse_Docx ( struct ag47_script * const script, const LPWSTR s4wPath, const LPCWSTR wszFileName )
 {
-  rLog ( L"Parse_DOCX: %-256s ==> %-256s\n", s4wOrigin, s4wPath );
+  rLog ( L"Parse_DOCX: %-256s ==> %-256s\n", script->s4wOrigin, s4wPath );
   const UINT n = r4_get_count_s4w ( s4wPath );
   r4_push_array_s4w_sz ( s4wPath, L"\\word\\document.xml", 0 );
   struct file_map fm;
@@ -470,7 +470,7 @@ static UINT rParse_Docx ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const L
   };
 
   const LPWSTR s4w1 = r4_alloca_s4w(kPathMax);
-  r4_push_path_s4w_s4w ( s4w1, s4wPathOutLogsDir );
+  r4_push_path_s4w_s4w ( s4w1, script->s4wPathOutLogsDir );
   UINT i = 0;
   for ( i = 0; i <= 999; ++i )
   {
@@ -481,7 +481,7 @@ static UINT rParse_Docx ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const L
   }
 
   const LPWSTR s4w2 = r4_alloca_s4w(kPathMax);
-  r4_push_path_s4w_s4w ( s4w2, s4wPathOutLogsDir );
+  r4_push_path_s4w_s4w ( s4w2, script->s4wPathOutLogsDir );
   swprintf ( s4w2+r4_get_count_s4w(s4w2), kPathMax-r4_get_count_s4w(s4w2),
           L"\\%s.[%03u].log", wszFileName, i );
 
@@ -489,7 +489,7 @@ static UINT rParse_Docx ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const L
   struct docx_state_ink _ = {
     .pF_xml = rOpenFileToWriteWith_UTF16_BOM ( s4w1 ),
     .pF_log = rOpenFileToWriteWith_UTF16_BOM ( s4w2 ),
-    .s4wOrigin = s4wOrigin,
+    .s4wOrigin = script->s4wOrigin,
     .wszFileName = wszFileName,
     .d = 0,
     .i = kD7_Null,
@@ -502,7 +502,7 @@ static UINT rParse_Docx ( const LPWSTR s4wPath, const LPCWSTR s4wOrigin, const L
   if ( _.iS != kD7_Null )
   {
     const LPWSTR s4w3 = r4_alloca_s4w(kPathMax);
-    r4_push_path_s4w_s4w ( s4w3, s4wPathOutLogsDir );
+    r4_push_path_s4w_s4w ( s4w3, script->s4wPathOutLogsDir );
     swprintf ( s4w3+r4_get_count_s4w(s4w3), kPathMax-r4_get_count_s4w(s4w3),
             L"\\%s.[%03u].%u.txt", wszFileName, i, _.iS );
     FILE * const pF_log2 = rOpenFileToWriteWith_UTF16_BOM ( s4w3 );

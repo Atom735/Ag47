@@ -247,15 +247,15 @@ static UINT rParse_Txt_Begin ( struct docx_state_ink * const p, struct file_map 
   return 0;
 }
 
-static UINT rParse_Txt ( const LPCWSTR s4wPath, const LPCWSTR s4wOrigin, const LPCWSTR wszFileName )
+static UINT rParse_Txt ( struct ag47_script * const script, const LPCWSTR s4wPath, const LPCWSTR wszFileName )
 {
-  rLog ( L"Parse_TXT: %-256s ==> %-256s\n", s4wOrigin, s4wPath );
+  rLog ( L"Parse_TXT: %-256s ==> %-256s\n", script->s4wOrigin, s4wPath );
   struct file_map fm;
   UINT iErr = 0;
   if ( ( iErr = rFS_FileMapOpen ( &fm, s4wPath ) ) ) goto P_End2;
 
   const LPWSTR s4w1 = r4_alloca_s4w(kPathMax);
-  r4_push_path_s4w_s4w ( s4w1, s4wPathOutLogsDir );
+  r4_push_path_s4w_s4w ( s4w1, script->s4wPathOutLogsDir );
   UINT i = 0;
   for ( i = 0; i <= 999; ++i )
   {
@@ -267,7 +267,7 @@ static UINT rParse_Txt ( const LPCWSTR s4wPath, const LPCWSTR s4wOrigin, const L
 
   struct docx_state_ink _ = {
     .pF_log = rOpenFileToWriteWith_UTF16_BOM ( s4w1 ),
-    .s4wOrigin = s4wOrigin,
+    .s4wOrigin = script->s4wOrigin,
     .wszFileName = wszFileName,
     .d = 0,
     .iS = kD74_Null,
@@ -286,7 +286,7 @@ static UINT rParse_Txt ( const LPCWSTR s4wPath, const LPCWSTR s4wOrigin, const L
   if ( _.iS != kD7_Null )
   {
     const LPWSTR s4w3 = r4_alloca_s4w(kPathMax);
-    r4_push_path_s4w_s4w ( s4w3, s4wPathOutLogsDir );
+    r4_push_path_s4w_s4w ( s4w3, script->s4wPathOutLogsDir );
     swprintf ( s4w3+r4_get_count_s4w(s4w3), kPathMax-r4_get_count_s4w(s4w3),
             L"\\%s.[%03u].%u.txt", wszFileName, i, _.iS );
     FILE * const pF_log2 = rOpenFileToWriteWith_UTF16_BOM ( s4w3 );
