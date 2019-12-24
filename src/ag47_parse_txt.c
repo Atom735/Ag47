@@ -42,19 +42,25 @@ static UINT rParse_Txt_Begin ( struct docx_state_ink * const p, struct file_map 
     if ( p->iS == kD74_well && _wcsnicmp_l (  s4w, L"Диаметр скважины", 16, g_locale_C ) == 0 )
     {
       LPWSTR w;
+      setlocale ( LC_ALL, "C" );
       p->fDi = wcstod ( s4w+17, &w );
+      setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
       p->iS = kD74_Di;
       while ( *w && p->iS == kD74_Di )
       {
         if ( _wcsnicmp_l (  w, L"Глубина башмака кондуктора", 26, g_locale_C ) == 0 )
         {
+          setlocale ( LC_ALL, "C" );
           p->fGBK = wcstod ( w+27, NULL );
+          setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
           p->iS = kD74_GBK;
         }
         else
         if ( _wcsnicmp_l (  w, L"Глубина башмака", 15, g_locale_C ) == 0 )
         {
+          setlocale ( LC_ALL, "C" );
           p->fGBK = wcstod ( w+16, NULL );
+          setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
           p->iS = kD74_GBK;
         }
         else
@@ -67,7 +73,9 @@ static UINT rParse_Txt_Begin ( struct docx_state_ink * const p, struct file_map 
     if ( (p->iS == kD74_Di || p->iS == kD74_GBK) && _wcsnicmp_l ( s4w, L"Угол склонения", 14, g_locale_C ) == 0 )
     {
       LPWSTR w;
+      setlocale ( LC_ALL, "C" );
       p->fAngleS = wcstod ( s4w+15, &w );
+      setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
       p->iS = kD74_angle;
       UINT i = rParse_Docx_GetAngleType ( &w );
       if ( i == 0 )
@@ -86,7 +94,9 @@ static UINT rParse_Txt_Begin ( struct docx_state_ink * const p, struct file_map 
         {
           if ( _wcsnicmp_l (  w, L"Альтитуда", 9, g_locale_C ) == 0 )
           {
+            setlocale ( LC_ALL, "C" );
             p->fAlt = wcstod ( w+10, &w );
+            setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
             p->iS = kD74_alt;
           }
           else
@@ -98,7 +108,9 @@ static UINT rParse_Txt_Begin ( struct docx_state_ink * const p, struct file_map 
         {
           if ( _wcsnicmp_l (  w, L"Забой", 5, g_locale_C ) == 0 )
           {
+            setlocale ( LC_ALL, "C" );
             p->fZab = wcstod ( w+6, &w );
+            setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
             p->iS = kD74_zab;
           }
           else
@@ -203,7 +215,10 @@ static UINT rParse_Txt_Begin ( struct docx_state_ink * const p, struct file_map 
         {
           LPWSTR w = s4w;
           struct ink_data t = { };
+
+          setlocale ( LC_ALL, "C" );
           t.fDepth = wcstod ( w, &w );
+          setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
 
           fwprintf ( p->pF_log, L" >>> DEPTH %f\r\n", t.fDepth );
 
@@ -211,18 +226,26 @@ static UINT rParse_Txt_Begin ( struct docx_state_ink * const p, struct file_map 
           if ( p->iAn == 1 )
           {
             if ( *w == '*' )  { t.iAn = 2; ++w; } else { t.iAn = 1; }
+            setlocale ( LC_ALL, "C" );
             t.fAn = wcstod ( w, &w );
+            setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
             while ( iswspace ( *w ) ) { ++w; }
             if ( *w == '*' )  { t.iAz = 2; ++w; } else { t.iAz = 1; }
+            setlocale ( LC_ALL, "C" );
             t.fAz = wcstod ( w, &w );
+            setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
           }
           else
           {
             if ( *w == '*' )  { t.iAz = 2; ++w; } else { t.iAz = 1; }
+            setlocale ( LC_ALL, "C" );
             t.fAz = wcstod ( w, &w );
+            setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
             while ( iswspace ( *w ) ) { ++w; }
             if ( *w == '*' )  { t.iAn = 2; ++w; } else { t.iAn = 1; }
+            setlocale ( LC_ALL, "C" );
             t.fAn = wcstod ( w, &w );
+            setlocale ( LC_ALL, g7CharMapCP[p->iCodePage] );
           }
           if ( t.iAn && p->bAn )
           {
@@ -251,8 +274,7 @@ static UINT rParse_Txt ( struct ag47_script * const script, const LPCWSTR s4wPat
 {
   rLog ( L"Parse_TXT: %-256s ==> %-256s\n", script->s4wOrigin, s4wPath );
   struct file_map fm;
-  UINT iErr = 0;
-  if ( ( iErr = rFS_FileMapOpen ( &fm, s4wPath ) ) ) goto P_End2;
+  if ( !rFS_FileMapOpen ( &fm, s4wPath ) ) { return FALSE; }
 
   const LPWSTR s4w1 = r4_alloca_s4w(kPathMax);
   r4_push_path_s4w_s4w ( s4w1, script->s4wPathOutLogsDir );
@@ -278,7 +300,7 @@ static UINT rParse_Txt ( struct ag47_script * const script, const LPCWSTR s4wPat
   _.iLineFeed           = rGetBufEndOfLine ( fm.pData, fm.nSize );
   setlocale ( LC_ALL, g7CharMapCP[_.iCodePage] );
 
-
+  UINT iErr = 0;
   if ( ( iErr = rParse_Txt_Begin ( &_, &fm ) ) ) { goto P_End; }
 
   fwprintf ( _.pF_log, L"%.*hs", fm.nSize, fm.pData );
@@ -312,21 +334,61 @@ static UINT rParse_Txt ( struct ag47_script * const script, const LPCWSTR s4wPat
       fwprintf (pF_log2, L"\r\n" );
     }
     fclose ( pF_log2 );
+
+    {
+      setlocale ( LC_ALL, "C" );
+      rLogToAB ( script, "INK\t%u\t%f\t%f\t%f\r\n",
+              _.fWell, _.fAlt,
+              _.pData[0].fDepth,
+              _.pData[_.nData-1].fDepth );
+      LPWSTR const s4w = r4_alloca_s4w ( kPathMax );
+      r4_push_path_s4w_s4w ( s4w, script->s4wPathOutInkDir );
+      for ( UINT i = 0; TRUE; ++i )
+      {
+        swprintf ( s4w+r4_get_count_s4w(s4w), kPathMax-r4_get_count_s4w(s4w),
+                L"\\%u_%u.txt",
+                _.fWell, i );
+        FILE * const pf = _wfopen ( s4w, L"rb" );
+        if ( pf ) { fclose ( pf ); } else { break; }
+      }
+      FILE * const pf = _wfopen ( s4w, L"wb" );
+      if ( pf )
+      {
+        fprintf ( pf, "%u\t\t\r\n", _.fWell );
+        for ( UINT i = 0; i < _.nData; ++i )
+        {
+          fprintf ( pf, "%f\t", _.pData[i].fDepth );
+          if ( _.pData[i].iAn == 1 ) { fprintf ( pf, "%f", _.pData[i].fAn ); }
+          else if ( _.pData[i].iAn == 2 ) { fprintf ( pf, "*%f", _.pData[i].fAn ); }
+          else { fprintf ( pf, "          " ); }
+          fprintf ( pf, "\t" );
+          if ( _.pData[i].iAz == 1 ) { fprintf ( pf, "%f", _.pData[i].fAz + _.fAngleS ); }
+          else if ( _.pData[i].iAz == 2 ) { fprintf ( pf, "*%f", _.pData[i].fAz + _.fAngleS ); }
+          else { fprintf ( pf, "          " ); }
+          fprintf ( pf, "\r\n" );
+        }
+        fclose ( pf );
+      }
+      else
+      {
+        rLog_Error ( L"Невозможно открыть файл для записи [%s]\n", s4w );
+      }
+    }
   }
 
   P_End:
   fclose ( _.pF_log );
 
-  if ( _.iS == kD7_Null )
-  {
-    if ( !DeleteFile ( s4w1 ) )
-    {
-      rLog_Error_WinAPI ( DeleteFile, GetLastError(), L"%s\n", s4w1 );
-      iErr = __LINE__;
-    }
-  }
+  // if ( _.iS == kD7_Null )
+  // {
+  //   if ( !DeleteFile ( s4w1 ) )
+  //   {
+  //     rLog_Error_WinAPI ( DeleteFile, GetLastError(), L"%s\n", s4w1 );
+  //     iErr = __LINE__;
+  //   }
+  // }
 
   rFS_FileMapClose ( &fm );
   P_End2:
-  return iErr;
+  return iErr == 0;
 }

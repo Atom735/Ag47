@@ -1,7 +1,7 @@
 ﻿.PHONY : all
 
 
-CC := gcc
+CC := gcc -O3
 
 
 CPPFLAGS := \

@@ -5,7 +5,7 @@ static BOOL rFS_SearchExe_7Zip ( LPWSTR const s4w )
 {
   WIN32_FIND_DATA ffd;
   r4_cut_end_s4w ( s4w, 0 );
-  r4_push_array_s4w_sz ( s4w, L"C:/Program Files/7-Zip/7z.exe", 0 );
+  r4_push_array_s4w_sz ( s4w, L"C:\\Program Files\\7-Zip\\7z.exe", 0 );
   HANDLE const hFind = FindFirstFile ( s4w, &ffd );
   if ( hFind == INVALID_HANDLE_VALUE )
   {
@@ -25,7 +25,7 @@ static BOOL rFS_SearchExe_7Zip ( LPWSTR const s4w )
 static BOOL rFS_SearchExe_Wordconv ( LPWSTR const s4w )
 {
   WIN32_FIND_DATA ffd;
-  LPCWSTR const wsz = L"C:/Program Files (x86)/Microsoft Office/Office*";
+  LPCWSTR const wsz = L"C:\\Program Files (x86)\\Microsoft Office\\Office*";
   HANDLE const hFind = FindFirstFile ( wsz, &ffd );
   if ( hFind == INVALID_HANDLE_VALUE )
   {
@@ -36,9 +36,9 @@ static BOOL rFS_SearchExe_Wordconv ( LPWSTR const s4w )
   do
   {
     r4_cut_end_s4w ( s4w, 0 );
-    r4_push_array_s4w_sz ( s4w, L"C:/Program Files (x86)/Microsoft Office/", 0 );
+    r4_push_array_s4w_sz ( s4w, L"C:\\Program Files (x86)\\Microsoft Office\\", 0 );
     r4_push_array_s4w_sz ( s4w, ffd.cFileName, 0 );
-    r4_push_array_s4w_sz ( s4w, L"/wordconv.exe", 0 );
+    r4_push_array_s4w_sz ( s4w, L"\\wordconv.exe", 0 );
     WIN32_FIND_DATA _ffd;
     HANDLE const _hFind = FindFirstFile ( s4w, &_ffd );
     if ( _hFind != INVALID_HANDLE_VALUE )
@@ -59,10 +59,10 @@ static BOOL rFS_ProcRun ( LPWSTR const cmd, LPPROCESS_INFORMATION const pi )
   STARTUPINFO s =
   {
     .cb = sizeof(STARTUPINFO),
-    .dwFlags = STARTF_USESTDHANDLES,
-    .hStdInput = GetStdHandle ( STD_INPUT_HANDLE ),
-    .hStdOutput = GetStdHandle ( STD_OUTPUT_HANDLE ),
-    .hStdError = GetStdHandle ( STD_ERROR_HANDLE ),
+    // .dwFlags = STARTF_USESTDHANDLES,
+    // .hStdInput = GetStdHandle ( STD_INPUT_HANDLE ),
+    // .hStdOutput = GetStdHandle ( STD_OUTPUT_HANDLE ),
+    // .hStdError = GetStdHandle ( STD_ERROR_HANDLE ),
   };
   if ( !CreateProcess ( NULL, cmd, NULL , NULL, TRUE,
           CREATE_UNICODE_ENVIRONMENT | NORMAL_PRIORITY_CLASS,

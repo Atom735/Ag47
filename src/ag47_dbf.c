@@ -114,7 +114,7 @@ static BOOL rSignatureMem_DBF ( BYTE const * p, UINT n )
 }
 
 
-static UINT rParse_DBF_Begin ( struct docx_state_ink * const p, struct file_map const * const fm )
+static UINT rParse_DBF_Begin ( struct ag47_script * const script, struct docx_state_ink * const p, struct file_map const * const fm )
 {
   struct file_data_ptr fdp = { .p = fm->pData, .n = fm->nSize, .nLine = 1 };
   struct dbf_file_header _head;
@@ -177,10 +177,22 @@ static UINT rParse_DBF_Begin ( struct docx_state_ink * const p, struct file_map 
 
   fwprintf ( p->pF_log, L"DBF === Таблица данных ===\r\n" );
 
+  UINT i_NSKV = 0;
+  UINT i_GLUB = 0;
+  UINT i_UGOL = 0;
+  UINT i_AZIMUT = 0;
+
   fwprintf ( p->pF_log, L"DEL" );
   D4ForAll_s4s ( pFields, j, N1 )
   {
     fwprintf ( p->pF_log, L" | (%hc) %-*hs", pFields[j].iType, pFields[j].nLength, pFields[j].sName );
+    if ( strcasecmp ( pFields[j].sName, "NSKV" ) == 0 ) { i_NSKV = j; }
+    else
+    if ( strcasecmp ( pFields[j].sName, "GLUB" ) == 0 ) { i_GLUB = j; }
+    else
+    if ( strcasecmp ( pFields[j].sName, "UGOL1" ) == 0 ) { i_UGOL = j; }
+    else
+    if ( strcasecmp ( pFields[j].sName, "AZIMUT" ) == 0 ) { i_AZIMUT = j; }
   }
   fwprintf ( p->pF_log, L" |\r\n" );
   fwprintf ( p->pF_log, L"---" );
@@ -191,6 +203,11 @@ static UINT rParse_DBF_Begin ( struct docx_state_ink * const p, struct file_map 
   fwprintf ( p->pF_log, L"-|\r\n" );
 
 
+  FILE * pf = NULL;
+  LPCSTR sWell = fdp.p;
+
+  setlocale ( LC_ALL, "C" );
+
   for ( UINT i = 0; i < _head.nNumberOfRecords; ++i )
   {
     if ( fdp.p[0] == ' ' ) { fwprintf ( p->pF_log, L"   " ); }
@@ -198,15 +215,43 @@ static UINT rParse_DBF_Begin ( struct docx_state_ink * const p, struct file_map 
     if ( fdp.p[0] == '*' ) { fwprintf ( p->pF_log, L" x " ); }
     else
     { fwprintf ( p->pF_log, L">?<" ); }
+
+    if ( memcmp ( sWell, fdp.p+pFields[i_NSKV].nAddress, pFields[i_NSKV].nLength ) )
+    {
+      sWell = fdp.p+pFields[i_NSKV].nAddress;
+      if ( pf ) fclose ( pf );
+      LPWSTR const s4w = r4_alloca_s4w ( kPathMax );
+      r4_push_path_s4w_s4w ( s4w, script->s4wPathOutInkDir );
+      for ( UINT i = 0; TRUE; ++i )
+      {
+        swprintf ( s4w+r4_get_count_s4w(s4w), kPathMax-r4_get_count_s4w(s4w),
+                L"\\%-*.*hs_%u.txt",
+                pFields[i_NSKV].nLength, pFields[i_NSKV].nLength, fdp.p+pFields[i_NSKV].nAddress,
+                i );
+        FILE * const _qpf = _wfopen ( s4w, L"rb" );
+        if ( _qpf ) { fclose ( _qpf ); } else { break; }
+      }
+      pf = _wfopen ( s4w, L"wb" );
+      fprintf ( pf, "%-*.*s\t\t\r\n",
+              pFields[i_NSKV].nLength, pFields[i_NSKV].nLength, fdp.p+pFields[i_NSKV].nAddress );
+    }
+
+    fprintf ( pf, "%-*.*s\t%-*.*s\t%-*.*s\r\n",
+            pFields[i_GLUB].nLength, pFields[i_GLUB].nLength, fdp.p+pFields[i_GLUB].nAddress,
+            pFields[i_UGOL].nLength, pFields[i_UGOL].nLength, fdp.p+pFields[i_UGOL].nAddress,
+            pFields[i_AZIMUT].nLength, pFields[i_AZIMUT].nLength, fdp.p+pFields[i_AZIMUT].nAddress );
+
     D4ForAll_s4s ( pFields, j, N3 )
     {
-      WCHAR wsz[64];
       fwprintf ( p->pF_log, L" | %-*.*hs    ", pFields[j].nLength, pFields[j].nLength, fdp.p+pFields[j].nAddress );
     }
     fwprintf ( p->pF_log, L" |\r\n" );
 
     rFileData_Skip ( &fdp, _head.nLengthOfEachRecord );
   }
+
+  if ( pf ) fclose ( pf );
+
 
   r4_free_s4s ( pFields );
   return 0;
@@ -217,7 +262,7 @@ static UINT rParse_DBF ( struct ag47_script * const script, const LPCWSTR s4wPat
   rLog ( L"Parse_DBF: %-256s ==> %-256s\n", script->s4wOrigin, s4wPath );
   struct file_map fm;
   UINT iErr = 0;
-  if ( ( iErr = rFS_FileMapOpen ( &fm, s4wPath ) ) ) goto P_End2;
+  if ( !rFS_FileMapOpen ( &fm, s4wPath ) ) { return FALSE; }
 
   const LPWSTR s4w1 = r4_alloca_s4w(kPathMax);
   r4_push_path_s4w_s4w ( s4w1, script->s4wPathOutLogsDir );
@@ -250,7 +295,7 @@ static UINT rParse_DBF ( struct ag47_script * const script, const LPCWSTR s4wPat
   _.iLineFeed           = rGetBufEndOfLine ( fm.pData, fm.nSize );
   setlocale ( LC_ALL, g7CharMapCP[_.iCodePage] );
 
-  if ( ( iErr = rParse_DBF_Begin ( &_, &fm ) ) ) { goto P_End; }
+  if ( ( iErr = rParse_DBF_Begin ( script, &_, &fm ) ) ) { goto P_End; }
 
 
   P_End:
@@ -259,5 +304,5 @@ static UINT rParse_DBF ( struct ag47_script * const script, const LPCWSTR s4wPat
 
   rFS_FileMapClose ( &fm );
   P_End2:
-  return iErr;
+  return iErr == 0;
 }

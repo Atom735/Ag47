@@ -993,7 +993,7 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
   {
     LPWSTR const s4w = r4_alloca_s4w ( kPathMax );
     r4_push_path_s4w_s4w ( s4w, script->s4wPathOutLasDir );
-    for ( UINT i = 1; TRUE; ++i )
+    for ( UINT i = 0; TRUE; ++i )
     {
       swprintf ( s4w+r4_get_count_s4w(s4w), kPathMax-r4_get_count_s4w(s4w),
               L"\\%.*hs_%s_%u.LAS",
@@ -1011,6 +1011,19 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
     else
     {
       rLog_Error ( L"Невозможно открыть файл для записи [%s]\n", s4w );
+    }
+    UINT const nCC = r4_get_count_s4s ( _las.aCurves ); // Количество данных в строке
+
+    setlocale ( LC_ALL, "C" );
+    for ( UINT i = 1; i < nCC; ++i )
+    {
+      rLogToAB ( script, "LAS\t%.*s\t%.*s\t%f\t%f\r\n",
+              _las.w_WELL.n,
+              _las.w_WELL.p,
+              _las.aCurves[i].s.n,
+              _las.aCurves[i].s.p,
+              _las.aCurves[i].fSTRT,
+              _las.aCurves[i].fSTOP );
     }
   }
   rFS_DeleteTree ( _las.s4wTempOut );

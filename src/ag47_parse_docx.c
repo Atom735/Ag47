@@ -461,7 +461,7 @@ static UINT rParse_Docx ( struct ag47_script * const script, const LPWSTR s4wPat
   r4_push_array_s4w_sz ( s4wPath, L"\\word\\document.xml", 0 );
   struct file_map fm;
   UINT iErr = 0;
-  if ( ( iErr = rFS_FileMapOpen ( &fm, s4wPath ) ) ) goto P_End2;
+  if ( !rFS_FileMapOpen ( &fm, s4wPath ) ) { return FALSE; }
 
   static xmlSAXHandler hSAX = {
     .characters = (charactersSAXFunc)_rDocx_CB_characters,
@@ -528,6 +528,46 @@ static UINT rParse_Docx ( struct ag47_script * const script, const LPWSTR s4wPat
       fwprintf (pF_log2, L"\r\n" );
     }
     fclose ( pF_log2 );
+
+    {
+      setlocale ( LC_ALL, "C" );
+      rLogToAB ( script, "INK\t%u\t%f\t%f\t%f\r\n",
+              _.fWell, _.fAlt,
+              _.pData[0].fDepth,
+              _.pData[_.nData-1].fDepth );
+      LPWSTR const s4w = r4_alloca_s4w ( kPathMax );
+      r4_push_path_s4w_s4w ( s4w, script->s4wPathOutInkDir );
+      for ( UINT i = 0; TRUE; ++i )
+      {
+        swprintf ( s4w+r4_get_count_s4w(s4w), kPathMax-r4_get_count_s4w(s4w),
+                L"\\%u_%u.txt",
+                _.fWell, i );
+        FILE * const pf = _wfopen ( s4w, L"rb" );
+        if ( pf ) { fclose ( pf ); } else { break; }
+      }
+      FILE * const pf = _wfopen ( s4w, L"wb" );
+      if ( pf )
+      {
+        fprintf ( pf, "%u\t\t\r\n", _.fWell );
+        for ( UINT i = 0; i < _.nData; ++i )
+        {
+          fprintf ( pf, "%f\t", _.pData[i].fDepth );
+          if ( _.pData[i].iAn == 1 ) { fprintf ( pf, "%f", _.pData[i].fAn ); }
+          else if ( _.pData[i].iAn == 2 ) { fprintf ( pf, "*%f", _.pData[i].fAn ); }
+          else { fprintf ( pf, "          " ); }
+          fprintf ( pf, "\t" );
+          if ( _.pData[i].iAz == 1 ) { fprintf ( pf, "%f", _.pData[i].fAz + _.fAngleS ); }
+          else if ( _.pData[i].iAz == 2 ) { fprintf ( pf, "*%f", _.pData[i].fAz + _.fAngleS ); }
+          else { fprintf ( pf, "          " ); }
+          fprintf ( pf, "\r\n" );
+        }
+        fclose ( pf );
+      }
+      else
+      {
+        rLog_Error ( L"Невозможно открыть файл для записи [%s]\n", s4w );
+      }
+    }
   }
 
   P_End:
@@ -551,5 +591,5 @@ static UINT rParse_Docx ( struct ag47_script * const script, const LPWSTR s4wPat
   rFS_FileMapClose ( &fm );
   P_End2:
   r4_cut_end_s4w ( s4wPath, n );
-  return iErr;
+  return iErr == 0;
 }

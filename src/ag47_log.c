@@ -48,3 +48,10 @@ static VOID rLog_Error_WinAPI_ ( const LPCSTR szFile,  const UINT nLine, const L
 }
 #define rLog_Error_WinAPI(prFunc,iErr,...) rLog_Error_WinAPI_(__FILE__,__LINE__,#prFunc,iErr,__VA_ARGS__)
 
+static VOID rLogToAB ( struct ag47_script * const script, LPCSTR const fmt, ... )
+{
+  va_list args;
+  va_start ( args, fmt );
+  vfprintf ( script->pFAB, fmt, args );
+  va_end ( args );
+}

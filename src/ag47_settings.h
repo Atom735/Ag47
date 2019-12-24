@@ -15,6 +15,7 @@
   LPWSTR                s4wPathOutTempDir;
   LPWSTR                s4wPathOutLogsDir;
   LPWSTR                s4wPathOutLasDir;
+  LPWSTR                s4wPathOutInkDir;
   LPWSTR                s4wPathOutErrorDir;
 
   /* Код ошибки скрипта */
@@ -25,6 +26,7 @@
   UINT                  nLasDetected;
   /* Файл базы данных всех обработаных LAS файлов  */
   FILE                * pFLasDB;
+  FILE                * pFAB;
   /* Количество файлов с ошибкой */
   UINT                  nErrorFiles;
 
@@ -236,3 +238,4 @@ LPCWSTR const g7ErrStrScript[] =
 
 
 };
+
