@@ -14,6 +14,21 @@
             "cStandard": "c11",
             "cppStandard": "gnu++14",
             "intelliSenseMode": "gcc-x64"
+        },
+        {
+            "name": "Win32 work",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "compilerPath": "D:\\ARGilyazeev\\mingw64\\bin\\gcc.exe",
+            "intelliSenseMode": "gcc-x64",
+            "cStandard": "c11",
+            "cppStandard": "gnu++14"
         }
     ],
     "version": 4
