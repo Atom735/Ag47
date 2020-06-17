@@ -1,14 +1,10 @@
 ﻿.PHONY : all
 
-
-CC := gcc -O3
-
-
 CPPFLAGS := \
   -DWIN32_LEAN_AND_MEAN \
   -D_WIN32_WINNT=_WIN32_WINNT_WIN7 \
   -DUNICODE \
-  -IF:/ARGilyazeev/msys64/mingw64/include/libxml2\
+  -I$(PATH_MSYS2)/include/libxml2 \
 
 CFLAGS := \
   -Wall \
@@ -45,7 +41,6 @@ DEPENDS := \
 OUT_EXE := main.exe
 
 all : $(OUT_EXE)
-	$(OUT_EXE)
 
 $(OUT_EXE) : src/main.c $(DEPENDS)
-	$(CC) -v -o $@ $(CPPFLAGS) $(CFLAGS) $< $(LDFLAGS)
+	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) $< $(LDFLAGS)

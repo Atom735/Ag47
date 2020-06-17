@@ -348,6 +348,3 @@ static BOOL rFileData_Cmp ( struct file_data_ptr const * const p, LPCSTR sz )
   }
   return !(n || *sz);
 }
-
-
-

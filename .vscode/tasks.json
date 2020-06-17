@@ -1,0 +1,24 @@
+{
+    "tasks": [
+        {
+            "label": "Build project (work)",
+            "type": "shell",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "command": "C:\\msys64\\mingw64\\bin\\mingw32-make.exe",
+            "args": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PATH": "C:\\msys64\\mingw64\\bin",
+                    "CC": "C:\\msys64\\mingw64\\bin\\gcc.exe",
+                    "PATH_MSYS2": "C:/msys64/mingw64/"
+                }
+            },
+            "problemMatcher": []
+        }
+    ],
+    "version": "2.0.0"
+}
