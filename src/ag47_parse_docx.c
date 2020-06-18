@@ -589,7 +589,7 @@ static UINT rParse_Docx ( struct ag47_script * const script, const LPWSTR s4wPat
   }
 
   rFS_FileMapClose ( &fm );
-  P_End2:
+  // P_End2:
   r4_cut_end_s4w ( s4wPath, n );
   return iErr == 0;
 }

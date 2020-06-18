@@ -1,5 +1,5 @@
 ﻿OUT_RECREATE            =   TRUE;
 RECURSIVE               =   0;
 LAS_ERR                 =   0.15;
-RUN                     =   "F:\ARGilyazeev\github\Ag47\t_data";
-# RUN="\\NAS\Public\common\Gilyazeev\ГИС";
+RUN                     =   "\\NAS\Public\common\Gilyazeev\ГИС";
+# RUN=;

@@ -933,7 +933,7 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
   };
   if ( !rFS_FileMapOpen ( &(_las.fm), s4wPath ) ) { return FALSE; }
   UINT a1[g7CharMapCount], a2[g7CharMapCount];
-  _las.iCP[1] = rGetBufCodePage ( _las.fm.pData, _las.fm.nSize, a1, a2 );
+  _las.iCP[1] = rGetBufLocale ( _las.fm.pData, _las.fm.nSize, NULL, a2 );
   _las.iCP[0] = g7CharMapId[_las.iCP[1]];
   setlocale ( LC_ALL, g7CharMapCP[_las.iCP[1]] );
   // _las.iNL    = rGetBuf_NL ( _las.fm.pData, _las.fm.nSize );
@@ -1097,4 +1097,3 @@ static BOOL rLas_ParseFile ( struct ag47_script * const script, LPCWSTR const s4
   return TRUE;
   // return _las.iErr == 0;
 }
-

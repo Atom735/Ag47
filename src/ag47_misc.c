@@ -7,14 +7,6 @@ static FILE * rOpenFileToWriteWith_UTF16_BOM ( LPCWSTR const wszFname )
 }
 
 
-static UINT rGetMaxNums ( UINT const * const pData, UINT const nSize )
-{
-  UINT k = 0;
-  for ( UINT i = 1; i < nSize; ++i ) { if ( pData[i] > pData[k] ) { k = i; } }
-  return k;
-}
-
-
 enum
 {
   kNewLine_Null = 0,

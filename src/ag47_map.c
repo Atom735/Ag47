@@ -1,150 +1,127 @@
-﻿
-static WCHAR const g7CharMap[][0x80] =
+﻿// Количество используемых кодировок
+#define g7CharMapCount 6
+
+// Таблица отображений из кодировки в WCHAR
+static WCHAR const g7CharMap[g7CharMapCount][0x80] =
 {
   #define _D7x(_a_,_w_,_s_) [_a_-0x80] = _w_,
-  #define _D7xA(_a_,_w_,_s_)
-  #define _D7xPre(_i_,_ss_,_sl_) {
-  #define _D7xPost() },
+  #define _D7xBegin(_i_,_ss_,_sl_) {
+  #define _D7xEnd() },
   #include "ag47_maps.x"
   #undef _D7x
-  #undef _D7xA
-  #undef _D7xPre
-  #undef _D7xPost
+  #undef _D7xBegin
+  #undef _D7xEnd
 };
 
-#define g7CharMapCount (sizeof(g7CharMap)/sizeof(*g7CharMap))
-
-static CHAR const * const g7CharMapNames[] =
+// Расширенные названия кодировок
+static CHAR const * const g7CharMapNames[g7CharMapCount] =
 {
-  #define _D7xPre(_i_,_ss_,_sl_) _sl_,
+  #define _D7xBegin(_i_,_ss_,_sl_) _sl_,
   #include "ag47_maps_names.x"
-  #undef _D7xPre
+  #undef _D7xBegin
 };
 
-#define g7CharMapCountU (sizeof(g7CharMapNames)/sizeof(*g7CharMapNames))
-
-static UINT const g7CharMapId[g7CharMapCountU] =
+// Номер кодировки по стандарту MSDN
+static UINT const g7CharMapId[g7CharMapCount] =
 {
-  #define _D7xPre(_i_,_ss_,_sl_) _i_,
+  #define _D7xBegin(_i_,_ss_,_sl_) _i_,
   #include "ag47_maps_names.x"
-  #undef _D7xPre
+  #undef _D7xBegin
 };
 
-static CHAR const * const g7CharMapCP[g7CharMapCountU] =
+// Строчная запись номера кодировки по стандарту MSDN
+static CHAR const * const g7CharMapCP[g7CharMapCount] =
 {
-  #define _D7xPre(_i_,_ss_,_sl_) "."#_i_,
+  #define _D7xBegin(_i_,_ss_,_sl_) "."#_i_,
   #include "ag47_maps_names.x"
-  #undef _D7xPre
+  #undef _D7xBegin
 };
 
-static _locale_t g7CharMapLocales[g7CharMapCountU];
+// Локали кодировок
+static _locale_t g7CharMapLocales[g7CharMapCount];
 
-static UINT const g7CodePoint_Rus1[] =
-{
-  #define _D7x(_0_,_n_) _n_,
-  #include "ag47_tbl_rus_a.x"
-  #undef _D7x
-};
-
-
-#define r7CodePoint_Rus1_lower(_i_,_0_)  (((_i_)>=L'а'&&(_i_)<=L'я')?(g7CodePoint_Rus1[(_i_)-L'а']):((_i_)==L'ё')?(g7CodePoint_Rus1[L'я'-L'a'+1]):(_0_))
-#define r7CodePoint_Rus1_upper(_i_,_0_)  (((_i_)>=L'А'&&(_i_)<=L'Я')?(g7CodePoint_Rus1[(_i_)-L'А']):((_i_)==L'Ё')?(g7CodePoint_Rus1[L'я'-L'a'+1]):(_0_))
-#define r7CodePoint_Rus1(_i_,_0_)        r7CodePoint_Rus1_lower(_i_,r7CodePoint_Rus1_upper(_i_,_0_))
-
-
-struct
-{
-  WCHAR w[2];
-  UINT u;
-} static const g7CodePoint_Rus2[] =
-{
-  #define _D7x(_0_,_1_,_n_) {.w[0]=_0_,.w[1]=_1_,.u=_n_,},
-  #include "ag47_tbl_rus_b.x"
-  #undef _D7x
-};
-
-
-INT r7CodePoint_Rus2_rCmp ( const LPCWSTR pkey, __typeof__(*g7CodePoint_Rus2) const * const pE )
-{
-  return ((INT)(pkey[0]) - (INT)(pE->w[0])) ?: ((INT)(pkey[1]) - (INT)(pE->w[1])) ?: 0;
-}
-
-
-/*
-  return
-  '\r'                  - CR    (Mac)
-  '\n'                  - LF    (Unix)
-  0x0D0A                - CRLF  (Windows)
-*/
-static UINT rGetBufEndOfLine ( BYTE const * pBuf, UINT nSize )
-{
-  UINT iCRLF = 0;
-  UINT iCR = 0;
-  UINT iLF = 0;
-  while ( nSize > 1)
-  {
-    if ( *pBuf == '\r' ) { ++iCR; if ( iCR == 8 ) { return '\r'; }
-    if ( pBuf[1] == '\n' ) { ++iCRLF; if ( iCRLF == 4 ) { return 0x0D0A; } } }
-    else
-    if ( *pBuf == '\n' ) { ++iLF;  if ( iLF == 8 ) { return '\n'; } }
-    ++pBuf; --nSize;
-  }
-  iCRLF *= 2;
-  return (iCRLF>iCR) ? ( (iCRLF>iLF) ? 0x0D0A : '\n' ) : ( (iCR>iLF) ? '\r' : '\n' );
-}
-#define D7_CharCode(_a_,_i_) (g7CharMap[_i_][_a_])
-
+// Загрузка всех локалей
 static UINT rLocalsInit ( )
 {
-  for ( UINT i = 0; i < g7CharMapCountU; ++i )
+  for ( UINT i = 0; i < g7CharMapCount; ++i )
   {
     g7CharMapLocales[i] = _create_locale ( LC_ALL, g7CharMapCP[i] );
-    rLog ( L"%-64.64hs%hs\n", g7CharMapNames[i], setlocale ( LC_ALL, g7CharMapCP[i] ) );
+    rLog ( L"%-64.64hs%p\n", g7CharMapNames[i], g7CharMapLocales[i] );
   }
   setlocale ( LC_ALL, "C" );
   return 0;
 }
+// Освобождение всех локалей
 static UINT rLocalsFree ( )
 {
-  for ( UINT i = 0; i < g7CharMapCountU; ++i )
+  for ( UINT i = 0; i < g7CharMapCount; ++i )
   {
     _free_locale ( g7CharMapLocales[i] );
   }
   return 0;
 }
 
-static UINT rGetBufCodePage ( BYTE const * pBuf, UINT nSize, UINT a1[g7CharMapCount], UINT a2[g7CharMapCount] )
-{
-  for ( UINT i = 0; i < g7CharMapCount; ++i )
-  {
-    a1[i] = a2[i] = 0;
-  }
+// =============================================================================
 
+// Получить сокращённые данные руского символа из WCHAR
+// 0xdead - если символ не русский
+#define D7GetRusCompact(_a) ((_a>=L'а'&&_a<=L'я')?(_a-L'а'):(_a==L'ё')?32:((_a>=L'А'&&_a<=L'Я')?(_a-L'А'):(_a==L'Ё')?32:0xdead))
+
+// Частота встречаемости русских пар букв в скоращённой записи 33х33
+static UINT const g7CodePoint_Rus2F[33*33] =
+{
+  #define _D7x(_0_,_1_,_n_) [(_0_!=L'ё'?_0_-L'а':32)*33+(_1_!=L'ё'?_1_-L'а':32)] = _n_,
+  #include "ag47_tbl_rus_b.x"
+  #undef _D7x
+};
+
+// Получить частоту встречаемости пары букв WCHAR
+static INT rGetPoint_Rus2 ( const WCHAR a, const WCHAR b )
+{
+  if ( a < 0x7f || b < 0x7f ) { return 0; }
+  if ( D7GetRusCompact(a) != 0xdead && D7GetRusCompact(b) != 0xdead )
+  { return g7CodePoint_Rus2F[D7GetRusCompact(a)*33+D7GetRusCompact(b)]; }
+  return -300;
+}
+
+// Возвращает номер локали предподчтительный для буффера
+// в pOutNewLine возвращает kNewLine_... - символ перевода строки
+// в iOutCP возвращает массив значений рейтенга каждой кодировки
+static UINT rGetBufLocale ( BYTE const * pBuf, UINT nSize, UINT * const pOutNewLine, INT * const pOutCP )
+{
+  UINT iCR = 0;
+  UINT iLF = 0;
+  INT  iCP[g7CharMapCount];
+  if ( *pBuf == '\r' ) { ++iCR; } else
+  if ( *pBuf == '\n' ) { ++iLF; }
   --nSize;
-  WCHAR w[2];
   for ( ; nSize; --nSize,++pBuf )
   {
+    if ( *pBuf == '\r' ) { ++iCR; } else
+    if ( *pBuf == '\n' ) { ++iLF; } else
     if ( ((*pBuf)&0x80) )
     {
       for ( UINT i = 0; i < g7CharMapCount; ++i )
       {
-        w[0] = towlower(D7_CharCode(((*pBuf)&0x7f),i));
-        w[1] = towlower(D7_CharCode(((pBuf[1])&0x7f),i));
-        a1[i] += r7CodePoint_Rus1(w[0],0);
-        __typeof__(*g7CodePoint_Rus2) const * const p = bsearch (
-                w, g7CodePoint_Rus2,
-                sizeof(g7CodePoint_Rus2)/sizeof(*g7CodePoint_Rus2),
-                sizeof(*g7CodePoint_Rus2),
-                (int (*)(const void *, const void *))r7CodePoint_Rus2_rCmp );
-        if ( p )
-        {
-          a2[i] += p -> u;
-        }
+        iCP[i] += rGetPoint_Rus2(g7CharMap[i][((*pBuf)&0x7f)], g7CharMap[i][((pBuf[1])&0x7f)]);
       }
     }
   }
-  return rGetMaxNums ( a2, g7CharMapCount );
+  if ( pOutNewLine )
+  {
+    if ( iCR == iLF ) { *pOutNewLine = kNewLine_CRLF; } else
+    if ( iLF >= iCR ) { *pOutNewLine = kNewLine_LF; } else { *pOutNewLine = kNewLine_CR; }
+  }
+  if ( pOutCP ) { memcpy ( pOutCP, iCP, sizeof(iCP) ); }
+  UINT k = 0;
+  for ( UINT i = 1; i < g7CharMapCount; ++i ) { if ( iCP[i] > iCP[k] ) { k = i; } }
+  return k;
 }
+
+
+
+
+
 
 
 
@@ -163,11 +140,11 @@ enum
 static UINT rGetCodePageIdByAsciiName ( const LPCSTR sz )
 {
   if ( *sz == '.' ) { return atoi(sz+1); }
-  #define _D7xPre(_i_,_ss_,_sl_) \
+  #define _D7xBegin(_i_,_ss_,_sl_) \
     if ( strncasecmp ( sz, _ss_, sizeof(_ss_)-1 ) == 0 && !isalnum ( sz[sizeof(_ss_)-1] ) ) { return _i_; } \
     if ( strncasecmp ( sz, _sl_, sizeof(_sl_)-1 ) == 0 && !isalnum ( sz[sizeof(_sl_)-1] ) ) { return _i_; }
   #include "ag47_maps_names.x"
-  #undef _D7xPre
+  #undef _D7xBegin
   return 0;
 }
 /*
@@ -177,9 +154,9 @@ static LPCSTR rGetCodePageNameById ( UINT const iCP )
 {
   switch ( iCP )
   {
-    #define _D7xPre(_i_,_ss_,_sl_) case _i_: return _ss_;
+    #define _D7xBegin(_i_,_ss_,_sl_) case _i_: return _ss_;
     #include "ag47_maps_names.x"
-    #undef _D7xPre
+    #undef _D7xBegin
     default: return NULL;
   }
 }
@@ -195,9 +172,9 @@ static UINT rGetCodePageNumById ( UINT const iCP )
   enum { k__rGetCodePageNumById = __COUNTER__, };
   switch ( iCP )
   {
-    #define _D7xPre(_i_,_ss_,_sl_) case _i_: return __COUNTER__-k__rGetCodePageNumById;
+    #define _D7xBegin(_i_,_ss_,_sl_) case _i_: return __COUNTER__-k__rGetCodePageNumById;
     #include "ag47_maps_names.x"
-    #undef _D7xPre
+    #undef _D7xBegin
     default: return 0;
   }
 }
@@ -233,4 +210,3 @@ static UINT rGetBOM ( struct mem_ptr_bin * const p )
   if ( rIsBOM_Utf32BE ( p ) ) { rMemPtrBin_Skip ( p, 4 ); return kCP_Utf32BE; }
   return 0;
 }
-

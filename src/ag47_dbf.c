@@ -291,8 +291,7 @@ static UINT rParse_DBF ( struct ag47_script * const script, const LPCWSTR s4wPat
     .s4w = r4_alloca_s4w(kPathMax),
   };
   UINT a1[g7CharMapCount], a2[g7CharMapCount];
-  _.iCodePage           = rGetBufCodePage ( fm.pData, fm.nSize, a1, a2 );
-  _.iLineFeed           = rGetBufEndOfLine ( fm.pData, fm.nSize );
+  _.iCodePage           = rGetBufLocale ( fm.pData, fm.nSize, &(_.iLineFeed), a2 );
   setlocale ( LC_ALL, g7CharMapCP[_.iCodePage] );
 
   if ( ( iErr = rParse_DBF_Begin ( script, &_, &fm ) ) ) { goto P_End; }
