@@ -70,3 +70,4 @@ Module.symvers
 Mkfile.old
 dkms.conf
 __dbf.json
+__dbf_formated.json
