@@ -1,18 +1,23 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+import 'dart:math';
 
 import 'package:pedantic/pedantic.dart';
 
-
 /*
+  Folder for search => Folder Tree
+  Folder Tree => Las files[]
   Las file => Stream<Raw>
   Stream<Raw> => get CodePage and LineFeed
   Stream<Raw> => Stream<String>
   Stream<String> => Parsed Las File
-  Parsed Las File => Modifeded
+  Parsed Las File => Save Modifeded
   Parsed Las File => Set Data
+  Get Well Name
 */
+
+
 
 
 class Ag47Script {
@@ -28,6 +33,7 @@ class Ag47Script {
       pathOut = ((json['out']??Directory.current.path)+'/.ag47_out')
     {
       Directory(pathOut).createSync(recursive: true);
+      Directory(pathOut+'/las').createSync(recursive: true);
       outLog = File(pathOut+'/log.txt').openWrite(mode: FileMode.writeOnly);
       encodings = [];
       encodings.add(Encoding.getByName('IBM855'));
@@ -54,6 +60,8 @@ class Ag47Script {
   {
     outLog.writeln(file);
     if (file.path.toLowerCase().endsWith('.las')) {
+      String path = pathOut+'/las'+file.path.substring(max(file.path.lastIndexOf('\\'), file.path.lastIndexOf('/')));
+      file.copy(path);
       final streamInRaw = file.openRead();
 
     }
