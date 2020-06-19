@@ -9,7 +9,7 @@ void runIsolate(SendPort sendPort) {
   Timer.periodic(new Duration(milliseconds: 100), (Timer t) {
     counter++;
     String msg = 'notification ' + counter.toString();
-    // stdout.write('SEND: ' + msg + ' - ');
+    print('SEND: ' + msg + ' - ');
     sendPort.send(msg);
   });
 }
