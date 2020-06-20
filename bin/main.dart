@@ -1,128 +1,72 @@
-import 'dart:convert';
-import 'dart:io';
 import 'dart:async';
-import 'dart:math';
+import 'dart:isolate';
 
-import 'package:pedantic/pedantic.dart';
+import 'mapping.dart';
 
-/*
-  Folder for search => Folder Tree
-  Folder Tree => Las files[]
-  Las file => Stream<Raw>
-  Stream<Raw> => get CodePage and LineFeed
-  Stream<Raw> => Stream<String>
-  Stream<String> => Parsed Las File
-  Parsed Las File => Save Modifeded
-  Parsed Las File => Set Data
-  Get Well Name
-*/
-
-
-
-
-class Ag47Script {
-  final List<String> paths;
-  final String pathOut;
-  IOSink outLog;
-  List<Encoding> encodings;
-
-  Ag47Script(this.paths, this.pathOut, this.outLog);
-
-  Ag47Script.fromJson(Map<String, dynamic> json)
-    : paths = List.unmodifiable(json['paths']),
-      pathOut = ((json['out']??Directory.current.path)+'/.ag47_out')
-    {
-      Directory(pathOut).createSync(recursive: true);
-      Directory(pathOut+'/las').createSync(recursive: true);
-      outLog = File(pathOut+'/log.txt').openWrite(mode: FileMode.writeOnly);
-      encodings = [];
-      encodings.add(Encoding.getByName('IBM855'));
-      encodings.add(Encoding.getByName('2046'));
-      encodings.add(Encoding.getByName('cp855'));
-      encodings.add(Encoding.getByName('855'));
-      encodings.add(Encoding.getByName('csIBM855'));
-
-      encodings.add(Encoding.getByName('IBM866'));
-      encodings.add(Encoding.getByName('windows-1251'));
-      encodings.add(Encoding.getByName('KOI8-R'));
-      encodings.add(Encoding.getByName('ISO-8859-5'));
-    }
-
-  Map<String, dynamic> toJson() =>
-    {
-      'paths': paths,
-      'out': pathOut,
-    };
-
-
-
-  void parseFile(final File file)
-  {
-    outLog.writeln(file);
-    if (file.path.toLowerCase().endsWith('.las')) {
-      String path = pathOut+'/las'+file.path.substring(max(file.path.lastIndexOf('\\'), file.path.lastIndexOf('/')));
-      file.copy(path);
-      final streamInRaw = file.openRead();
-
-    }
-  }
-
-  void done()
-  {
-    outLog.close();
-    print('done!');
-  }
-
-  void run() {
-    var idirscount = 0;
-    for (final path in paths) {
-      final dir = Directory(path);
-      unawaited(dir.exists().then((ex)
-      {
-        ++idirscount;
-        dir.list(recursive: true, followLinks: false).listen((entity) {
-          if (entity is File) {
-            parseFile(entity);
-          }
-        }, onDone: (){ if((--idirscount) == 0) done(); });
-      } ));
-    }
-  }
+class IsoData {
+  int id;
+  SendPort sendPortIn; // Порт через который изолят может отправлять сообщения
+  SendPort sendPortOut; // Порт через который главный изолят посылает сообщения
+  int jobs;
+  Map<String, List<String>> map;
 }
 
+void runIsolate(IsoData data) {
+  final receivePort = ReceivePort(); // Порт прослушиваемый изолятом
+  StreamSubscription<dynamic> subscriber; // Подписчик изолята
+  subscriber = receivePort.listen((msg) {
+    if (msg is String) {
+      if (msg == '--end') {
+        print('[${data.id}]: end');
+        subscriber.cancel();
+        subscriber = null;
+      }
+    }
+  });
 
+  data.sendPortOut = receivePort.sendPort;
+  data.jobs = 0;
+  print('[${data.id}]: send data');
+  data.sendPortIn.send(data);
+}
 
+const isoCount = 3;
 Future<void> main(List<String> args) async {
-  Ag47Script.fromJson(json.decode(File('script.json').readAsStringSync())).run();
+  final map = Map.unmodifiable(await loadMappings('mappings'));
+  final iso = List<IsoData>.filled(isoCount, IsoData(), growable: false);
+  final isolate = List<Future<Isolate>>(isoCount);
 
-  // for (var dirPath in d['dirs']) {
-  //   Directory(dirPath).exists()
-  //     .then((value) {
-  //       if(value) {
-  //         Directory(dirPath).list(recursive: true, followLinks: false)
-  //     .listen((e) {
-  //       if(e is File)
-  //       {
-  //         var file = e;
-  //         final path = e.path.toLowerCase();
-  //         if(path.endsWith('.las')) { parseLas(file); }
-  //         else
-  //         if(path.endsWith('.txt')) { parseTxt(file); }
-  //         else
-  //         if(path.endsWith('.doc')) { parseDoc(file); }
-  //         else
-  //         if(path.endsWith('.docx')) { parseDocx(file); }
-  //         else
-  //         if(path.endsWith('.dbf')) { parseDbf(file); }
-  //       }
-  //     });}});
-  // }
+  final receivePort = ReceivePort(); // Порт прослушиваемый главным изолятом
+  StreamSubscription<dynamic> subscriber;
+  subscriber = receivePort.listen((data) {
+    if (data is IsoData) {
+      print('main: [${data.id}] updated');
+      iso[data.id - 1] = data;
+      var b = true;
+      for (var i in iso) {
+        if (i.jobs != 0) {
+          b = false;
+        }
+      }
+      if (b) {
+        for (var i in iso) {
+          print('main: send [${i.id}] end');
+          i.sendPortOut.send('--end');
+        }
+        subscriber.cancel();
+        Future.wait(isolate);
+        print('main: end');
+      }
+    }
+  });
 
-
-
-  // Directory('\\\\NAS\\Public\\common')
-  //   .list(recursive: true, followLinks: false)
-  //     .listen((entity) {
-
-  //     });
+  for (var i = 0; i < isoCount; i++) {
+    iso[i].map = map;
+    iso[i].id = i + 1;
+    iso[i].jobs = 1;
+    iso[i].sendPortIn = receivePort.sendPort;
+    print('main: spawn [${i + 1}]');
+    isolate[i] =
+        Isolate.spawn(runIsolate, iso[i], debugName: 'isolate[${i + 1}]');
+  }
 }
