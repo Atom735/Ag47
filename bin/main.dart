@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -76,12 +75,6 @@ class LasFile {
  *
  * */
 
-/// Данные вспомогательных изолятов
-class IsoSub {}
-
-// Количество потоков
-const isoCount = 3;
-
 class IsoData {
   final int id; // Номер изолята (начиная с 1)
   final SendPort sendPort; // Порт для передачи данных главному изоляту
@@ -93,24 +86,86 @@ class IsoData {
         charMaps = Map.unmodifiable(charMaps);
 }
 
-void runIsolate(final IsoData data) {
+Future<void> parseLas(final IsoData iso, final File file) async {
+  // Считываем данные файла (Асинхронно)
+  final bytes = await file.readAsBytes();
+  // Подбираем кодировку
+  final cp = getMappingMax(getMappingRaitings(iso.charMaps, bytes));
+  final buffer = String.fromCharCodes(bytes
+      .map((i) => i >= 0x80 ? iso.charMaps[cp][i - 0x80].codeUnitAt(0) : i));
+  // Нарезаем на линии
+  final lines = LineSplitter.split(buffer);
+  var lineNum = 0;
+  LasFile las = LasFile();
+  final reLasLine = RegExp(r"^([^.]+)\.([^\s]*)\s+(.*):(.*)$");
+
+  var section = '';
+
+  for (final lineFull in lines) {
+    lineNum += 1;
+    final line = lineFull.trim();
+    if (line.isEmpty || line.startsWith('#')) {
+      // Пустую строку и строк с комментарием пропускаем
+      continue;
+    } else if (section == 'A') {
+      continue;
+    } else if (line.startsWith('~')) {
+      // Заголовок секции
+      section = line[1];
+      continue;
+    } else {
+      final f = reLasLine.firstMatch(line);
+      if (f == null) {
+        // |==<??>==<??>==|
+        throw 'LAS($lineNum): Непредвиденная строка';
+      }
+      final mnem = f.group(1).trim();
+      final unit = f.group(2).trim();
+      final data = f.group(3).trim();
+      final desc = f.group(4).trim();
+      switch (section) {
+        case 'V':
+          break;
+      }
+    }
+  }
+
+  /// ==========================================================================
+  /// TODO:
+  sleep(Duration(milliseconds: 30));
+  iso.sendPort.send([iso.id, '+']);
+}
+
+void runIsolate(final IsoData iso) {
+  // ===========================================================================
   final receivePort = ReceivePort(); // Порт прослушиваемый изолятом
+  var futures = <Future>[];
 
   receivePort.listen((final msg) {
     // Прослушивание сообщений полученных от главного изолята
     if (msg is String) {
       // Сообщение о закрытии
       if (msg == '-e') {
+        Future.wait(futures).then((final v) {
+          print('sub[${iso.id}]: end');
+          iso.sendPort.send([iso.id, '-e']);
+        });
         receivePort.close();
-        print('sub[${data.id}]: end');
-        data.sendPort.send([data.id, '-e']);
+        return;
+      }
+    } else if (msg is File) {
+      if (msg.path.toLowerCase().endsWith('.las')) {
+        futures.add(parseLas(iso, msg));
+        return;
       }
     }
+    print('sub[${iso.id}]: recieved unknown msg {$msg}');
+    // sleep(Duration(milliseconds: 300));
   });
 
   // Отправка данных для порта входящих сообщений
-  print('sub[${data.id}]: sync main');
-  data.sendPort.send([data.id, receivePort.sendPort]);
+  print('sub[${iso.id}]: sync main');
+  iso.sendPort.send([iso.id, receivePort.sendPort]);
 }
 
 Future<void> main(List<String> args) async {
@@ -144,32 +199,67 @@ Future<void> main(List<String> args) async {
       isoSends[i].send(msg);
     }
   }
+
+  void isoSendToIdle(final msg) {
+    var j = 0;
+    for (var i = 0; i < isoCount; i++) {
+      if (isoTasks[i] < isoTasks[j]) {
+        j = i;
+      }
+    }
+    isoTasks[j] += 1;
+    isoSends[j].send(msg);
+  }
+
   // == Функции конец ==========================================================
 
   receivePort.listen((final data) {
     if (data is List) {
-      // Передача порта для связи
       if (data[1] is SendPort) {
+        // Передача порта для связи
         isoTasks[data[0] - 1] = 0;
         isoSends[data[0] - 1] = data[1];
         print('main: sub[${data[0]}] synced');
         if (isoTasksZero()) {
           print('main: all subs synced');
 
-          isoSendToAll('-e');
+          Directory(r'\\NAS\Public\common\Gilyazeev\ГИС\Искринское м-е')
+              .list(recursive: true, followLinks: false)
+              .listen((final e) {
+            if (e is File) {
+              if (e.path.toLowerCase().endsWith('.las')) {
+                isoSendToIdle(e);
+              }
+            }
+          }, onDone: () {
+            isoSendToAll('-e');
+          });
         }
+        return;
       } else if (data[1] is String) {
-        // Ответ на просьбу закрыться
         if (data[1] == '-e') {
+          // Ответ на просьбу закрыться
           print('main: sub[${data[0]}] ended');
+          if (isoTasks[data[0] - 1] != 1) {
+            print('ERROR: sub[${data[0]}] have ${isoTasks[data[0] - 1]} tasks');
+          }
+
           isoTasks[data[0] - 1] = 0;
           if (isoTasksZero()) {
             print('main: all subs ended');
             receivePort.close();
           }
+          return;
+        } else if (data[1] == '+') {
+          // TODO
+          isoTasks[data[0] - 1] -= 1;
+          print('main: sub[${data[0]}] have ${isoTasks[data[0] - 1]} tasks');
+          return;
         }
       }
     }
+
+    print('main: recieved unknown msg {$data}');
   });
 
   // Создание изолятов
