@@ -32,6 +32,7 @@ Future<Map<String, List<String>>> loadMappings(final String path) async {
           }
         }
       }
+      map[name] = List.unmodifiable(map[name]);
     }
   }
   return map;
