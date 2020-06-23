@@ -9,25 +9,28 @@ import 'mapping.dart';
 class LasMethodData {
   String mnem;
   String unit;
-  String apiCode;
-  String description;
+  String data;
+  String desc;
   String strt;
+  double strtN;
   String stop;
+  double stopN;
   String step;
+  double stepN;
 }
 
 /// Разобранные данные
 class LasFile {
-  // ~V
-  int vVersion;
-  bool vWrap;
   // ~W
   String wStrt;
+  double wStrtNum;
   String wStop;
+  double wStopNum;
   String wStep;
+  double wStepNum;
   String wNull;
+  double wNullNum;
   String wWell;
-  String wDate;
   // ~C
   List<LasMethodData> methods;
 }
@@ -96,8 +99,10 @@ Future<void> parseLas(final IsoData iso, final File file) async {
   // Нарезаем на линии
   final lines = LineSplitter.split(buffer);
   var lineNum = 0;
-  LasFile las = LasFile();
-  final reLasLine = RegExp(r"^([^.]+)\.([^\s]*)\s+(.*):(.*)$");
+  final las = LasFile();
+  las.methods = [];
+  final reLasLine = RegExp(r'^([^.]+)\.([^\s]*)\s+(.*):(.*)$');
+  final reLasLineA = RegExp(r'([+-]?\d+\.?\d+)');
 
   var section = '';
 
@@ -108,6 +113,11 @@ Future<void> parseLas(final IsoData iso, final File file) async {
       // Пустую строку и строк с комментарием пропускаем
       continue;
     } else if (section == 'A') {
+      var i = 0;
+      reLasLineA.allMatches(line).forEach((e) {
+        las.methods[i].strt = e.group(0);
+        i += 1;
+      });
       continue;
     } else if (line.startsWith('~')) {
       // Заголовок секции
@@ -124,7 +134,38 @@ Future<void> parseLas(final IsoData iso, final File file) async {
       final data = f.group(3).trim();
       final desc = f.group(4).trim();
       switch (section) {
-        case 'V':
+        case 'W':
+          if (mnem == 'WELL') {
+            las.wWell = data;
+          }
+          if (mnem == 'STRT') {
+            las.wStrt = data;
+            las.wStrtNum = double.parse(data);
+          }
+          if (mnem == 'STOP') {
+            las.wStop = data;
+            las.wStopNum = double.parse(data);
+          }
+          if (mnem == 'STEP') {
+            las.wStep = data;
+            las.wStepNum = double.parse(data);
+          }
+          if (mnem == 'NULL') {
+            las.wNull = data;
+            las.wNullNum = double.parse(data);
+          }
+          break;
+        case 'C':
+          final lmd = LasMethodData();
+          lmd.mnem = mnem;
+          lmd.unit = unit;
+          lmd.data = data;
+          lmd.desc = desc;
+          lmd.strtN = las.wStopNum;
+          lmd.stopN = las.wStrtNum;
+          lmd.stepN = las.wStepNum;
+          lmd.step = las.wStep;
+          las.methods.add(lmd);
           break;
       }
     }
