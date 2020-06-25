@@ -82,14 +82,17 @@ class IsoData {
   final int id; // Номер изолята (начиная с 1)
   final SendPort sendPort; // Порт для передачи данных главному изоляту
   final Map<String, List<String>> charMaps; // Таблицы кодировок
+  final String pathOut;
 
   int iErrors;
   IOSink fErrors;
 
-  IsoData(final int id, final SendPort sendPort, final charMaps)
+  IsoData(final int id, final SendPort sendPort, final charMaps,
+      final String pathOut)
       : id = id,
         sendPort = sendPort,
-        charMaps = Map.unmodifiable(charMaps);
+        charMaps = Map.unmodifiable(charMaps),
+        pathOut = pathOut;
 }
 
 Future<void> parseLas(final IsoData iso, final File file) async {
@@ -130,7 +133,7 @@ Future<void> parseLas(final IsoData iso, final File file) async {
           // throw 'Всё, ужасно не правильно!';
           iso.iErrors += 1;
           iso.fErrors.writeln(file);
-          final newPath = '.ag-47/errors/${iso.id}/${iso.iErrors}.las';
+          final newPath = iso.pathOut + '/errors/${iso.id}/${iso.iErrors}.las';
           iso.fErrors.writeln('\t$newPath');
           iso.fErrors.writeln('\tОшибка в строке: $lineNum');
           fErr = file.copy(newPath);
@@ -163,7 +166,7 @@ Future<void> parseLas(final IsoData iso, final File file) async {
         // throw 'LAS($lineNum): Непредвиденная строка';
         iso.iErrors += 1;
         iso.fErrors.writeln(file);
-        final newPath = '.ag-47/errors/${iso.id}/${iso.iErrors}.las';
+        final newPath = iso.pathOut + '/errors/${iso.id}/${iso.iErrors}.las';
         iso.fErrors.writeln('\t$newPath');
         iso.fErrors.writeln('\tОшибка в строке: $lineNum');
         await file.copy(newPath);
@@ -222,9 +225,9 @@ void runIsolate(final IsoData iso) {
   final receivePort = ReceivePort(); // Порт прослушиваемый изолятом
   var futures = <Future>[];
 
-  Directory('.ag-47/errors/${iso.id}').createSync(recursive: true);
+  Directory(iso.pathOut + '/errors/${iso.id}').createSync(recursive: true);
   iso.iErrors = 0;
-  iso.fErrors = File('.ag-47/errors/${iso.id}/__.txt')
+  iso.fErrors = File(iso.pathOut + '/errors/${iso.id}/__.txt')
       .openWrite(mode: FileMode.writeOnly, encoding: utf8);
 
   receivePort.listen((final msg) {
@@ -233,11 +236,8 @@ void runIsolate(final IsoData iso) {
       // Сообщение о закрытии
       if (msg == '-e') {
         Future.wait(futures).then((final v) {
-          sleep(Duration(milliseconds: 3000));
           iso.fErrors.flush().then((final v) {
-            print('sub[${iso.id}]: $v');
             iso.fErrors.close().then((final v) {
-              print('sub[${iso.id}]: $v');
               print('sub[${iso.id}]: end');
               iso.sendPort.send([iso.id, '-e']);
             });
@@ -276,8 +276,13 @@ Future<void> main(List<String> args) async {
   final receivePort = ReceivePort();
   // Лас файлы
   final tableLas = <LasFile>[];
+  final pathOut = '.ag47';
 
-  Directory('.ag-47').createSync(recursive: true);
+  final dirOut = Directory(pathOut);
+  if (dirOut.existsSync()) {
+    dirOut.deleteSync(recursive: true);
+  }
+  dirOut.createSync(recursive: true);
   // == Функции начало =========================================================
   bool isoTasksZero() {
     for (final i in isoTasks) {
@@ -364,7 +369,7 @@ Future<void> main(List<String> args) async {
 
   // Создание изолятов
   for (var i = 0; i < isoCount; i++) {
-    final data = IsoData(i + 1, receivePort.sendPort, charMaps);
+    final data = IsoData(i + 1, receivePort.sendPort, charMaps, pathOut);
     isoTasks[i] = -1;
     print('main: spawn sub[${i + 1}]');
     isolate[i] = Isolate.spawn(runIsolate, data, debugName: 'sub[${i + 1}]');
