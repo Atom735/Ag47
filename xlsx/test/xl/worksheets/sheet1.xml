@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" 
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" 
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x14ac xr xr2 xr3" 
+    xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" 
+    xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" 
+    xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" 
+    xmlns:xr3="http://schemas.microsoft.com/office/spreadsheetml/2016/revision3" xr:uid="{00000000-0001-0000-0000-000000000000}">
+    <!-- <dimension ref="A1:T5"/> -->
+    <sheetViews>
+        <sheetView tabSelected="1" workbookViewId="0">
+            <pane ySplit="2" topLeftCell="A3" activePane="bottomRight" state="frozen"/>
+            <!-- <selection pane="bottomRight" sqref="A1:S5"/> -->
+        </sheetView>
+    </sheetViews>
+    <sheetFormatPr defaultRowHeight="15" x14ac:dyDescent="0.25"/>
+    <cols>
+        <col min="1" max="4" width="9.140625" style="1"/>
+        <col min="5" max="5" width="11.42578125" style="1" customWidth="1"/>
+        <col min="6" max="9" width="9.140625" style="1"/>
+        <col min="10" max="11" width="9.28515625" style="1" customWidth="1"/>
+        <col min="12" max="16384" width="9.140625" style="1"/>
+    </cols>
+    <sheetData>
+        <row r="1">
+            <c r="A1" t="s">
+                <v>0</v>
+            </c>
+            <c r="B1" t="s">
+                <v>1</v>
+            </c>
+            <c r="C1" t="s">
+                <v>2</v>
+            </c>
+            <c r="D1" t="s">
+                <v>3</v>
+            </c>
+            <c r="E1" t="s">
+                <v>4</v>
+            </c>
+            <c r="F1" t="s">
+                <v>5</v>
+            </c>
+            <c r="H1" t="s">
+                <v>6</v>
+            </c>
+        </row>
+        <row r="2">
+            <c r="H2" t="s">
+                <v>7</v>
+            </c>
+            <c r="J2" t="s">
+                <v>8</v>
+            </c>
+            <c r="L2" t="s">
+                <v>9</v>
+            </c>
+            <c r="N2" t="s">
+                <v>10</v>
+            </c>
+            <c r="P2" t="s">
+                <v>11</v>
+            </c>
+            <c r="R2" t="s">
+                <v>12</v>
+            </c>
+        </row>
+        <row r="3">
+            <c r="A3">
+                <v>350</v>
+            </c>
+            <c r="B3">
+                <v>1964</v>
+            </c>
+            <c r="C3">
+                <v>54854</v>
+            </c>
+            <c r="D3">
+                <v>62577.29</v>
+            </c>
+            <c r="E3">
+                <v>182.5</v>
+            </c>
+            <c r="F3">
+                <v>0</v>
+            </c>
+            <c r="G3">
+                <v>1200</v>
+            </c>
+            <c r="H3">
+                <v>800</v>
+            </c>
+            <c r="I3">
+                <v>1300</v>
+            </c>
+            <c r="J3">
+                <v>800</v>
+            </c>
+            <c r="K3">
+                <v>1300</v>
+            </c>
+            <c r="L3">
+                <v>800</v>
+            </c>
+            <c r="M3">
+                <v>1300</v>
+            </c>
+            <c r="N3">
+                <v>800</v>
+            </c>
+            <c r="O3">
+                <v>1300</v>
+            </c>
+            <c r="P3">
+                <v>800</v>
+            </c>
+            <c r="Q3">
+                <v>1300</v>
+            </c>
+            <c r="R3">
+                <v>800</v>
+            </c>
+            <c r="S3">
+                <v>1300</v>
+            </c>
+        </row>
+        <!-- <row r="4" spans="1:20" s="5" customFormat="1" x14ac:dyDescent="0.25">
+            <c r="A4" s="3">
+                <v>350</v>
+            </c>
+            <c r="B4" s="3"/>
+            <c r="C4" s="4"/>
+            <c r="D4" s="4"/>
+            <c r="E4" s="2"/>
+            <c r="F4" s="3">
+                <v>0</v>
+            </c>
+            <c r="G4" s="3">
+                <v>1900</v>
+            </c>
+            <c r="H4" s="3">
+                <v>1500</v>
+            </c>
+            <c r="I4" s="3">
+                <v>2000</v>
+            </c>
+            <c r="J4" s="3">
+                <v>1500</v>
+            </c>
+            <c r="K4" s="3">
+                <v>2000</v>
+            </c>
+            <c r="L4" s="3">
+                <v>1500</v>
+            </c>
+            <c r="M4" s="3">
+                <v>2000</v>
+            </c>
+            <c r="N4" s="3">
+                <v>1500</v>
+            </c>
+            <c r="O4" s="3">
+                <v>2000</v>
+            </c>
+            <c r="P4" s="3">
+                <v>1500</v>
+            </c>
+            <c r="Q4" s="3">
+                <v>2000</v>
+            </c>
+            <c r="R4" s="3">
+                <v>1500</v>
+            </c>
+            <c r="S4" s="3">
+                <v>2000</v>
+            </c>
+        </row>
+        <row r="5" spans="1:20" s="5" customFormat="1" x14ac:dyDescent="0.25">
+            <c r="A5" s="3">
+                <v>350</v>
+            </c>
+            <c r="B5" s="3"/>
+            <c r="C5" s="4"/>
+            <c r="D5" s="4"/>
+            <c r="E5" s="2"/>
+            <c r="F5" s="3"/>
+            <c r="G5" s="3"/>
+            <c r="H5" s="3">
+                <v>1000</v>
+            </c>
+            <c r="I5" s="3">
+                <v>1700</v>
+            </c>
+            <c r="J5" s="3">
+                <v>1000</v>
+            </c>
+            <c r="K5" s="3">
+                <v>1700</v>
+            </c>
+            <c r="L5" s="3">
+                <v>1000</v>
+            </c>
+            <c r="M5" s="3">
+                <v>1700</v>
+            </c>
+            <c r="N5" s="3">
+                <v>1000</v>
+            </c>
+            <c r="O5" s="3">
+                <v>1700</v>
+            </c>
+            <c r="P5" s="3">
+                <v>1000</v>
+            </c>
+            <c r="Q5" s="3">
+                <v>1700</v>
+            </c>
+            <c r="R5" s="3">
+                <v>1000</v>
+            </c>
+            <c r="S5" s="3">
+                <v>1700</v>
+            </c>
+        </row> -->
+    </sheetData>
+    <mergeCells count="13">
+        <mergeCell ref="A1:A2"/>
+        <mergeCell ref="B1:B2"/>
+        <mergeCell ref="C1:C2"/>
+        <mergeCell ref="D1:D2"/>
+        <mergeCell ref="E1:E2"/>
+        <mergeCell ref="F1:G2"/>
+
+        <mergeCell ref="H1:S1"/>
+
+        <mergeCell ref="H2:I2"/>
+        <mergeCell ref="J2:K2"/>
+        <mergeCell ref="L2:M2"/>
+        <mergeCell ref="N2:O2"/>
+        <mergeCell ref="P2:Q2"/>
+        <mergeCell ref="R2:S2"/>
+    </mergeCells>
+    <!-- <pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/> -->
+</worksheet>

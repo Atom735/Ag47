@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+    <si>
+        <t>Скважина</t>
+    </si>
+    <si>
+        <t>Год</t>
+    </si>
+    <si>
+        <t>Х устья</t>
+    </si>
+    <si>
+        <t>У устья</t>
+    </si>
+    <si>
+        <t>Альтитуда</t>
+    </si>
+    <si>
+        <t>Наличие инклинометра</t>
+    </si>
+    <si>
+        <t>Методы ГИС</t>
+    </si>
+    <si>
+        <t>PS</t>
+    </si>
+    <si>
+        <t>KS</t>
+    </si>
+    <si>
+        <t>DS</t>
+    </si>
+    <si>
+        <t>NGK</t>
+    </si>
+    <si>
+        <t>BK</t>
+    </si>
+    <si>
+        <t>MZ</t>
+    </si>
+</sst>
