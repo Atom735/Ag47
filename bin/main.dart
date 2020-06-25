@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:test/test.dart';
+
 import 'mapping.dart';
 
 /// Данные лога
@@ -83,6 +85,9 @@ class IsoData {
   final SendPort sendPort; // Порт для передачи данных главному изоляту
   final Map<String, List<String>> charMaps; // Таблицы кодировок
 
+  int iErrors;
+  IOSink fErrors;
+
   IsoData(final int id, final SendPort sendPort, final charMaps)
       : id = id,
         sendPort = sendPort,
@@ -102,7 +107,7 @@ Future<void> parseLas(final IsoData iso, final File file) async {
   final las = LasFile();
   las.methods = [];
   final reLasLine = RegExp(r'^([^.]+)\.([^\s]*)\s+(.*):(.*)$');
-  final reLasLineA = RegExp(r'([+-]?\d+\.?\d+)');
+  final reLasLineA = RegExp(r'[+-]?\d+(\.\d+)?');
 
   var section = '';
 
@@ -114,10 +119,40 @@ Future<void> parseLas(final IsoData iso, final File file) async {
       continue;
     } else if (section == 'A') {
       var i = 0;
+      Future<File> fErr;
+
       reLasLineA.allMatches(line).forEach((e) {
-        las.methods[i].strt = e.group(0);
+        final numStr = e.group(0);
+        final n = double.parse(numStr);
+
+        if (fErr != null) {
+          return;
+        }
+        if (i >= las.methods.length) {
+          // throw 'Всё, ужасно не правильно!';
+          iso.iErrors += 1;
+          iso.fErrors.writeln(file);
+          final newPath = '.ag-47/errors/${iso.id}/${iso.iErrors}.las';
+          iso.fErrors.writeln('\t$newPath');
+          iso.fErrors.writeln('\tОшибка в строке: $lineNum');
+          fErr = file.copy(newPath);
+          iso.sendPort.send([iso.id, '-las']);
+          return;
+        }
+        if (numStr != las.wNull) {
+          if (las.methods[i].strt == null) {
+            las.methods[i].strt = numStr;
+            las.methods[i].strtN = n;
+          }
+          las.methods[i].stop = numStr;
+          las.methods[i].stopN = n;
+        }
         i += 1;
       });
+      if (fErr != null) {
+        await fErr;
+        return;
+      }
       continue;
     } else if (line.startsWith('~')) {
       // Заголовок секции
@@ -127,7 +162,15 @@ Future<void> parseLas(final IsoData iso, final File file) async {
       final f = reLasLine.firstMatch(line);
       if (f == null) {
         // |==<??>==<??>==|
-        throw 'LAS($lineNum): Непредвиденная строка';
+        // throw 'LAS($lineNum): Непредвиденная строка';
+        iso.iErrors += 1;
+        iso.fErrors.writeln(file);
+        final newPath = '.ag-47/errors/${iso.id}/${iso.iErrors}.las';
+        iso.fErrors.writeln('\t$newPath');
+        iso.fErrors.writeln('\tОшибка в строке: $lineNum');
+        await file.copy(newPath);
+        iso.sendPort.send([iso.id, '-las']);
+        return;
       }
       final mnem = f.group(1).trim();
       final unit = f.group(2).trim();
@@ -161,10 +204,8 @@ Future<void> parseLas(final IsoData iso, final File file) async {
           lmd.unit = unit;
           lmd.data = data;
           lmd.desc = desc;
-          lmd.strtN = las.wStopNum;
-          lmd.stopN = las.wStrtNum;
-          lmd.stepN = las.wStepNum;
-          lmd.step = las.wStep;
+          lmd.strtN = null;
+          // lmd.step = las.wStep;
           las.methods.add(lmd);
           break;
       }
@@ -173,8 +214,9 @@ Future<void> parseLas(final IsoData iso, final File file) async {
 
   /// ==========================================================================
   /// TODO:
-  sleep(Duration(milliseconds: 30));
-  iso.sendPort.send([iso.id, '+']);
+  // sleep(Duration(milliseconds: 30));
+  iso.sendPort.send([iso.id, '+las', las]);
+  return;
 }
 
 void runIsolate(final IsoData iso) {
@@ -182,14 +224,26 @@ void runIsolate(final IsoData iso) {
   final receivePort = ReceivePort(); // Порт прослушиваемый изолятом
   var futures = <Future>[];
 
+  Directory('.ag-47/errors/${iso.id}').createSync(recursive: true);
+  iso.iErrors = 0;
+  iso.fErrors = File('.ag-47/errors/${iso.id}/__.txt')
+      .openWrite(mode: FileMode.writeOnly, encoding: utf8);
+
   receivePort.listen((final msg) {
     // Прослушивание сообщений полученных от главного изолята
     if (msg is String) {
       // Сообщение о закрытии
       if (msg == '-e') {
         Future.wait(futures).then((final v) {
-          print('sub[${iso.id}]: end');
-          iso.sendPort.send([iso.id, '-e']);
+          sleep(Duration(milliseconds: 3000));
+          iso.fErrors.flush().then((final v) {
+            print('sub[${iso.id}]: $v');
+            iso.fErrors.close().then((final v) {
+              print('sub[${iso.id}]: $v');
+              print('sub[${iso.id}]: end');
+              iso.sendPort.send([iso.id, '-e']);
+            });
+          });
         });
         receivePort.close();
         return;
@@ -207,6 +261,7 @@ void runIsolate(final IsoData iso) {
   // Отправка данных для порта входящих сообщений
   print('sub[${iso.id}]: sync main');
   iso.sendPort.send([iso.id, receivePort.sendPort]);
+  return;
 }
 
 Future<void> main(List<String> args) async {
@@ -221,6 +276,8 @@ Future<void> main(List<String> args) async {
   final isolate = List<Future<Isolate>>(isoCount);
   // Порт прослушиваемый главным изолятом
   final receivePort = ReceivePort();
+  // Лас файлы
+  final tableLas = <LasFile>[];
 
   Directory('.ag-47').createSync(recursive: true);
   // == Функции начало =========================================================
@@ -291,8 +348,12 @@ Future<void> main(List<String> args) async {
             receivePort.close();
           }
           return;
-        } else if (data[1] == '+') {
-          // TODO
+        } else if (data[1] == '+las') {
+          tableLas.add(data[2]);
+          isoTasks[data[0] - 1] -= 1;
+          print('main: sub[${data[0]}] have ${isoTasks[data[0] - 1]} tasks');
+          return;
+        } else if (data[1] == '-las') {
           isoTasks[data[0] - 1] -= 1;
           print('main: sub[${data[0]}] have ${isoTasks[data[0] - 1]} tasks');
           return;
