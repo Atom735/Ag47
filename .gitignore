@@ -9,7 +9,7 @@ build/
 doc/api/
 
 
-
+*.xlsx
 .data
 .ag47
 t_data
@@ -71,3 +71,4 @@ Mkfile.old
 dkms.conf
 __dbf.json
 __dbf_formated.json
+files.txt
