@@ -4,7 +4,7 @@ import 'dart:math';
 
 import 'dart:typed_data';
 
-import 'package:dart_test/freq_2letters.dart';
+import 'package:ag47/freq_2letters.dart';
 
 /// Поиск кодировок
 Future<Map<String, List<String>>> loadMappings(final String path) async {

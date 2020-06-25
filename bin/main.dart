@@ -3,8 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
-import 'package:test/test.dart';
-
 import 'mapping.dart';
 
 /// Данные лога
